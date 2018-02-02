@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Test program using Python wrapper for timsdata.dll"""
+"""Conversion program (testing only) to convert each frame in TIMS to a separate mzML
+
+It maps the ion mobility dimension to the RT axis, for easy visualization in TOPPView.
+
+DO NOT USE THIS IN PRODUCTION
+"""
 
 import sys
 
