@@ -5,20 +5,11 @@
 
 import sys
 
-if len(sys.argv) < 3:
-    raise RuntimeError("need arguments: tdf_directory output.mzML")
-
-analysis_dir = sys.argv[1]
-output_fname = sys.argv[2]
-
-if sys.version_info.major == 2:
-    analysis_dir = unicode(analysis_dir)
-
 import timsdata, sqlite3, sys, time
 import pyopenms
 import numpy as np, matplotlib.pyplot as plt
 
-def store_frame(frame_id, filename, q, exp, verbose=False):
+def store_frame(frame_id, td, conn, exp, verbose=False):
     """
     Store a single frame as an individual mzML file
 
@@ -54,22 +45,35 @@ def store_frame(frame_id, filename, q, exp, verbose=False):
         s.setPrecursors([p])
         exp.consumeSpectrum(s)
 
-td = timsdata.TimsData(analysis_dir)
-conn = td.conn
+def main():
 
-# Get total frame count:
-q = conn.execute("SELECT COUNT(*) FROM Frames")
-row = q.fetchone()
-N = row[0]
-print("Analysis has {0} frames.".format(N))
+    if len(sys.argv) < 3:
+        raise RuntimeError("need arguments: tdf_directory output.mzML")
 
-# Store output
-if output_fname.lower().endswith("mzml"):
-    consumer = pyopenms.PlainMSDataWritingConsumer(output_fname)
-if output_fname.lower().endswith("sqmass"):
-    consumer = pyopenms.MSDataSqlConsumer(output_fname)
+    analysis_dir = sys.argv[1]
+    output_fname = sys.argv[2]
 
-for frame_id in range(N):
-    store_frame(frame_id+1, "null", q, consumer)
+    if sys.version_info.major == 2:
+        analysis_dir = unicode(analysis_dir)
 
+    td = timsdata.TimsData(analysis_dir)
+    conn = td.conn
+
+    # Get total frame count:
+    q = conn.execute("SELECT COUNT(*) FROM Frames")
+    row = q.fetchone()
+    N = row[0]
+    print("Analysis has {0} frames.".format(N))
+
+    # Store output
+    if output_fname.lower().endswith("mzml"):
+        consumer = pyopenms.PlainMSDataWritingConsumer(output_fname)
+    if output_fname.lower().endswith("sqmass"):
+        consumer = pyopenms.MSDataSqlConsumer(output_fname)
+
+    for frame_id in range(N):
+        store_frame(frame_id+1, td, conn, consumer)
+
+if __name__ == "__main__":
+    main()
 
