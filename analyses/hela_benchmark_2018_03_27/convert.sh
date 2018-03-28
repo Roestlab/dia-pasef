@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --time=05:00:00
+#SBATCH --time=07:00:00
 #SBATCH --account=def-hroest
 #SBATCH --ntasks=4
 #SBATCH --mem-per-cpu 1024M
-#SBATCH --array=4-6
+#SBATCH --array=4-27
 
 # Python venv
 source /project/6011811/bin/pyenv_27/bin/activate
