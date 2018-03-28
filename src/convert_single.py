@@ -41,7 +41,9 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         width = float(tmp[1])
         mslevel = 2
 
-    print "mslevel", mslevel, msms
+    if verbose:
+        print "mslevel", mslevel, msms
+
     # Get the mapping of the ion mobility axis
     scan_number_axis = np.arange(num_scans, dtype=np.float64)
     ook0_axis = td.scanNumToOneOverK0(frame_id, scan_number_axis)
@@ -55,11 +57,11 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         index = np.array(scan[0], dtype=np.float64)
         mz = td.indexToMz(frame_id, index)
         intens = scan[1]
-        drift_time =  ook0_axis [ k ] 
+        drift_time = ook0_axis [k] 
         if compressFrame:
             allmz.append(mz)
             allint.append(intens)
-            allim.append( [drift_time for k in mz] )
+            allim.append([drift_time for k in mz])
             continue
 
         # Store data in OpenMS Spectrum file -> each TOF push is an individual
