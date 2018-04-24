@@ -38,6 +38,8 @@ class PasefMQData:
         if hasattr(self, 'all_peptides'):
             self.all_peptides['IonMobilityIndexK0'] = pasef_data.scanNumToOneOverK0(self.all_peptides['Ion mobility index'])
 
+        if hasattr(self, 'evidence'):
+            self.evidence['IonMobilityIndexK0'] = pasef_data.scanNumToOneOverK0(self.evidence['Ion mobility index'])
 
 class PasefData:
 
