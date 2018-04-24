@@ -8,4 +8,7 @@ setup(name='diapysef',
       author_email='max.frank@mail.utoronto.ca',
       license='MIT',
       packages=['diapysef'],
+      package_data={
+          'diapysef': ['data/*']
+      }
       zip_safe=False)
