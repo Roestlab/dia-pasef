@@ -12,12 +12,14 @@ class PasefMQData:
         self.msms_data = os.path.join(maxquant_directory, "msms.txt")
         self.all_peptides_data = os.path.join(maxquant_directory, "allPeptides.txt")
 
-    def get_evidence (self):
+    def get_evidence (self, timsdata = None):
         """Reads the evidence output of maxquant as pandas dataframe."""
         try:
             self.evidence = pd.read_table(self.evidence_data)
         except:
             print("Data File %s not found. Make sure you specified the right directory." % self.evidence_data)
+        if timsdata is not None:
+            self.annotate_ion_mobility(timsdata)
 
     def get_msms (self):
         """Reads the msms output of maxquant as pandas dataframe."""
@@ -26,12 +28,14 @@ class PasefMQData:
         except:
             print("Data File %s not found. Make sure you specified the right directory." % self.msms_data)
 
-    def get_all_peptides (self):
+    def get_all_peptides (self, timsdata = None):
         """Reads the allPeptides output of maxquant as pandas dataframe."""
         try:
             self.all_peptides = pd.read_table(self.all_peptides_data)
         except:
             print("Data File %s not found. Make sure you specified the right directory." % self.all_peptides_data)
+        if timsdata is not None:
+            self.annotate_ion_mobility(timsdata)
 
     def annotate_ion_mobility (self, pasef_data):
         """Adds ion mobility colums to the maxquant results that are currently loaded."""
