@@ -6,5 +6,6 @@ bruker/
 *.pyc
 
 # Setuptools distribution folder.
-diapysef/dist/
+src/diapysef/dist/
+src/diapysef/.python-version
 
