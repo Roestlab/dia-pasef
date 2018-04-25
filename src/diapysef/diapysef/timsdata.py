@@ -5,7 +5,7 @@ import os, sys
 from ctypes import *
 
 try:
-    if sys.platform[:5] == "win32":
+    if sys.platform[:5] == "win32" or sys.platform[:5] == "win64":
         libname = "timsdata.dll"
     elif sys.platform[:5] == "linux":
         libname = "libtimsdata.so"
@@ -142,60 +142,60 @@ class TimsData:
                            cnt)
             if success == 0:
                 throwLastTimsDataError(self.dll)
-                return out
+            return out
 
-            def indexToMz (self, frame_id, mzs):
-                return self.__callConversionFunc(frame_id, mzs, self.dll.tims_index_to_mz)
+        def indexToMz (self, frame_id, mzs):
+            return self.__callConversionFunc(frame_id, mzs, self.dll.tims_index_to_mz)
 
-            def mzToIndex (self, frame_id, mzs):
-                return self.__callConversionFunc(frame_id, mzs, self.dll.tims_mz_to_index)
+        def mzToIndex (self, frame_id, mzs):
+            return self.__callConversionFunc(frame_id, mzs, self.dll.tims_mz_to_index)
 
-            def scanNumToOneOverK0 (self, frame_id, mzs):
-                return self.__callConversionFunc(frame_id, mzs, self.dll.tims_scannum_to_oneoverk0)
+        def scanNumToOneOverK0 (self, frame_id, mzs):
+            return self.__callConversionFunc(frame_id, mzs, self.dll.tims_scannum_to_oneoverk0)
 
-            def oneOverK0ToScanNum (self, frame_id, mzs):
-                return self.__callConversionFunc(frame_id, mzs, self.dll.tims_oneoverk0_to_scannum)
+        def oneOverK0ToScanNum (self, frame_id, mzs):
+            return self.__callConversionFunc(frame_id, mzs, self.dll.tims_oneoverk0_to_scannum)
 
-            def scanNumToVoltage (self, frame_id, mzs):
-                return self.__callConversionFunc(frame_id, mzs, self.dll.tims_scannum_to_voltage)
+        def scanNumToVoltage (self, frame_id, mzs):
+            return self.__callConversionFunc(frame_id, mzs, self.dll.tims_scannum_to_voltage)
 
-            def voltageToScanNum (self, frame_id, mzs):
-                return self.__callConversionFunc(frame_id, mzs, self.dll.tims_voltage_to_scannum)
+        def voltageToScanNum (self, frame_id, mzs):
+            return self.__callConversionFunc(frame_id, mzs, self.dll.tims_voltage_to_scannum)
 
 
-            # Output: list of tuples (indices, intensities)
-            def readScans (self, frame_id, scan_begin, scan_end):
-                # buffer-growing loop
-                while True:
-                    cnt = int(self.initial_frame_buffer_size) # necessary cast to run with python 3.5
-                    buf = np.empty(shape=cnt, dtype=np.uint32)
-                    len = 4 * cnt
+        # Output: list of tuples (indices, intensities)
+        def readScans (self, frame_id, scan_begin, scan_end):
+            # buffer-growing loop
+            while True:
+                cnt = int(self.initial_frame_buffer_size) # necessary cast to run with python 3.5
+                buf = np.empty(shape=cnt, dtype=np.uint32)
+                len = 4 * cnt
 
-                    required_len = self.dll.tims_read_scans_v2(self.handle, frame_id, scan_begin, scan_end,
-                                                               buf.ctypes.data_as(POINTER(c_uint32)),
-                                                               len)
-                    if required_len == 0:
-                        throwLastTimsDataError(self.dll)
+                required_len = self.dll.tims_read_scans_v2(self.handle, frame_id, scan_begin, scan_end,
+                                                            buf.ctypes.data_as(POINTER(c_uint32)),
+                                                            len)
+                if required_len == 0:
+                    throwLastTimsDataError(self.dll)
 
-                    if required_len > len:
-                        if required_len > 16777216:
-                            # arbitrary limit for now...
-                            raise RuntimeError("Maximum expected frame size exceeded.")
-                        self.initial_frame_buffer_size = required_len / 4 + 1 # grow buffer
-                    else:
-                        break
+                if required_len > len:
+                    if required_len > 16777216:
+                        # arbitrary limit for now...
+                        raise RuntimeError("Maximum expected frame size exceeded.")
+                    self.initial_frame_buffer_size = required_len / 4 + 1 # grow buffer
+                else:
+                    break
 
-                result = []
-                d = scan_end - scan_begin
-                for i in range(scan_begin, scan_end):
-                    npeaks = buf[i-scan_begin]
-                    indices     = buf[d : d+npeaks]
-                    d += npeaks
-                    intensities = buf[d : d+npeaks]
-                    d += npeaks
-                    result.append((indices,intensities))
+            result = []
+            d = scan_end - scan_begin
+            for i in range(scan_begin, scan_end):
+                npeaks = buf[i-scan_begin]
+                indices     = buf[d : d+npeaks]
+                d += npeaks
+                intensities = buf[d : d+npeaks]
+                d += npeaks
+                result.append((indices,intensities))
 
-                return result
+            return result
 
     else:
 
