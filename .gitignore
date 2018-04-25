@@ -8,4 +8,5 @@ bruker/
 # Setuptools distribution folder.
 src/diapysef/dist/
 src/diapysef/.python-version
-
+src/diapysef/diapysef.egg-info
+src/diapysef/build
