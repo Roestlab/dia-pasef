@@ -8,6 +8,9 @@ Annotate the output of a Maxquant analysis with ion mobility in 1/K0.
 Usage: annotate_mq_ionmobility.py mqout_dir pasef_analysis_dir output_prefix
 """
 
+if len(sys.argv) < 4:
+    print("Usage: annotate_mq_ionmobility.py mqout_dir pasef_analysis_dir output_prefix")
+
 mqout = sys.argv[1]
 pasefdata = sys.argv[2]
 outfile = sys.argv[3]
