@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import os.path
+import pickle
 
 def plot_window_layout (windows, precursor_map = None, display_sc = False):
     """Plots the windows with an optional background of ms1 features"""
@@ -12,13 +13,15 @@ def plot_window_layout (windows, precursor_map = None, display_sc = False):
     #         precursor_map.annotate_ion_mobility()
     #     mq = precursor_map.all_peptides
     # elif type(precursor_map) == 'DataFrame':
+    w = windows
+
     if precursor_map is None:
-        mq = pd.read_pickle(os.path.join(os.path.dirname(__file__), 'data/all_peptides.pk'))
+        mq = pd.read_pickle(os.path.join(os.path.dirname(__file__), 'data/evidence_example.pickle'))
+        # ax = pickle.load(open(os.path.join(os.path.dirname(__file__), 'data/all_peptides_density.pickle'), 'rb'))
     else:
         mq = precursor_map
     if not display_sc:
         mq = mq[mq.Charge > 1]
-    w = windows
 
     f, ax = plt.subplots(figsize = (8,6))
     ax.hist2d(mq['m/z'], mq['IonMobilityIndexK0'], bins = [1000,1000], norm = LogNorm())
