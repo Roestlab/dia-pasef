@@ -8,6 +8,7 @@ Plots the window layout of a tims experiment with precursor density of a pasef e
 """
 if len(sys.argv) < 3:
     print("Usage: plot_dia_windows.py window_file precursor_map")
+    sys.exit()
 
 windows = pd.read_csv(sys.argv[1])
 precursors = pd.read_csv(sys.argv[2])

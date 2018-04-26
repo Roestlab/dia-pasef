@@ -11,6 +11,7 @@ Usage: annotate_mq_ionmobility.py mqout_dir pasef_analysis_dir output_prefix
 
 if len(sys.argv) < 4:
     print("Usage: annotate_mq_ionmobility.py mqout_dir pasef_analysis_dir output_prefix")
+    sys.exit()
 
 mqout = sys.argv[1]
 pasefdata = sys.argv[2]

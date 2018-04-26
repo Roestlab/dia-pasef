@@ -10,6 +10,7 @@ start and end coordinates (in scan number and 1/K0 units)
 """
 if len(sys.argv) < 3:
     print("Usage: get_dia_windows.py tims_analysis_directory output_file")
+    sys.exit()
 
 experiment = sys.argv[1]
 outfile = sys.argv[2]
