@@ -1,8 +1,13 @@
 from setuptools import setup
 
+def readme():
+    with open('README.rst') as f:
+        return f.read()
+
 setup(name='diapysef',
       version='0.1',
       description='Analysis and visualization of DIA PASEF data',
+      long_description=readme(),
       author='Max Frank, Hannes Roest',
       author_email='max.frank@mail.utoronto.ca',
       license='MIT',
