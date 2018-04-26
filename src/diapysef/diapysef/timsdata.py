@@ -49,10 +49,10 @@ try:
         dll_handle.tims_get_last_error_string(buf, len)
         raise RuntimeError(buf.value)
 
-    print("Found Bruker sdk. Access to the raw data is possible.")
+    print("Found Bruker sdk. Access to the raw data is possible. \n")
     sdk = True
 except OSError:
-    print("Bruker sdk not found. Some functionalities that need access to raw data will not be available. To activate that functionality place libtimsdata.so (Linux) or timsdata.dll in the src folder.")
+    print("Bruker sdk not found. Some functionalities that need access to raw data will not be available. To activate that functionality place libtimsdata.so (Linux) or timsdata.dll in the src folder. \n")
     sdk = False
 
 class TimsData:
@@ -80,8 +80,9 @@ class TimsData:
     def get_conversion_func(self):
         q = self.conn.execute("SELECT * FROM TimsCalibration")
         calib = q.fetchone()
-        def convert_im(im):
+        def convert_im(frame_id, im):
             im = np.array(im)
+            frame_id = frame_id # Currently the conversion does not depend on the frame_id
             return(1/(calib[8]+calib[9]/(calib[4]+((calib[5]-calib[4])/calib[3])*(im-calib[6]-calib[2]))))
         # Mobility[1/k0] = 1/(c6+c7/(c2+((c3-c2)/c1)*(scanno-c4-c0)))
         return convert_im
@@ -95,8 +96,9 @@ class TimsData:
         frames = q.fetchall()
         colnames = [description[0] for description in q.description]
         resframe = pd.DataFrame(data = frames, columns = colnames)
-        resframe["IMstart"] = self.scanNumToOneOverK0(resframe.ScanNumBegin)
-        resframe["IMend"] = self.scanNumToOneOverK0(resframe.ScanNumEnd)
+        # Currently the frame does not matter for the conversion, thus we can set it to 1
+        resframe["IMstart"] = self.scanNumToOneOverK0(1, resframe.ScanNumBegin)
+        resframe["IMend"] = self.scanNumToOneOverK0(1, resframe.ScanNumEnd)
         return resframe
 
     if sdk:
@@ -209,6 +211,6 @@ class TimsData:
 
             self.conn = sqlite3.connect(os.path.join(analysis_directory, "analysis.tdf"))
 
-        def scanNumToOneOverK0 (self, mzs):
+        def scanNumToOneOverK0 (self, frame_id, mzs):
             convert_scan_num = self.get_conversion_func()
-            return(convert_scan_num(mzs))
+            return(convert_scan_num(frame_id, mzs))
