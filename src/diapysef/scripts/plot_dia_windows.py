@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 from diapysef.plotting import plot_window_layout
 import sys
 import pandas as pd

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 from diapysef.pasefdata import PasefData
 from diapysef.pasefdata import PasefMQData
 import sys

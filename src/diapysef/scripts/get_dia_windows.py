@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 from diapysef.timsdata import TimsData
 import sys
 import pandas as pd
