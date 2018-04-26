@@ -22,8 +22,9 @@ try:
         dll = cdll.LoadLibrary(libname)
     else:
         raise Exception("Unsupported platform.")
-except OSError:
-    raise Exception("This functionality can only be carried out if the bruker sdk is present. Please install it first.")
+except OSError as e:
+    print("This functionality can only be carried out if the bruker sdk is present. Please install it first. The sdk can be installed by installing proteowizard(version >=3, http://proteowizard.sourceforge.net), or by placing the a library file in your path (For windows this will be timsdata.dll and for Linux libtimsdata.so).\n")
+    sys.exit()
 
 def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
     """
