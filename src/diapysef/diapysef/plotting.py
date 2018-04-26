@@ -39,4 +39,7 @@ def plot_window_layout (windows, precursor_map = None, display_sc = False):
                    max(mq['m/z'].max(), (w['IsolationMz'] + w['IsolationWidth']/2).max())),
            ylim = (min(mq['IonMobilityIndexK0'].min(), w['IMend'].min()),
                    max(mq['IonMobilityIndexK0'].max(), w['IMstart'].max())))
+    plt.xlabel('m/z')
+    plt.ylabel('Ion Mobility (1/K0)')
+
     plt.show()
