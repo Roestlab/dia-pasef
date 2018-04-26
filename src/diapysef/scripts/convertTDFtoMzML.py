@@ -1,7 +1,9 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """Conversion program to convert a Bruker TIMS file to a single mzML
 
 """
+from __future__ import print_function
 import argparse
 import sys
 import sqlite3
@@ -261,7 +263,7 @@ def main():
                         dest = "output_fname",
                         required = True)
     parser.add_argument("-m", "--merge",
-                        help = "How many frames to sum up into one",
+                        help = "How many consecutive frames with the same precursor are summed up",
                         type = int,
                         default = -1,
                         dest = "merge_scans")
