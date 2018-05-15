@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib.colors import LogNorm
 import pandas as pd
 import matplotlib.pyplot as plt
