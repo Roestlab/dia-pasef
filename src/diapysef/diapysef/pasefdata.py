@@ -46,6 +46,12 @@ class PasefMQData:
 
         if hasattr(self, 'evidence'):
             self.evidence['IonMobilityIndexK0'] = pasef_data.scanNumToOneOverK0(self.evidence['Ion mobility index'])
+    def convert_to_lib(self, irt_file):
+        if hasattr(self, 'msms') & hasattr(self, 'evidence'):
+            pasef_to_lib(self.evidence, self.msms, irt_file)
+        else:
+            print("Msms and evidence need to be present for library generation")
+            sys.exit()
 
 class PasefData:
 

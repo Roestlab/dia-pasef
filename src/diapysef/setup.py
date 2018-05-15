@@ -16,6 +16,7 @@ setup(name='diapysef',
           'pandas',
           'numpy',
           'matplotlib',
+          'statsmodels'
           'pyopenms'],
       package_data={
           'diapysef': ['data/*']
