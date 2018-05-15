@@ -1,3 +1,4 @@
+import sys
 import pandas as pd
 import statsmodels.formula.api as sm
 import numpy as np
@@ -17,7 +18,13 @@ def calibrate(data, plot = True):
 
 def pasef_to_tsv(evidence, msms, irt_file):
     """Converts a mq output to a library taking a best replicate approach."""
-    irt = pd.read_table("irt_file")
+    if isinstance(irt_file, str):
+        irt = pd.read_table(irt_file)
+    elif isinstance(irt, pd.DataFrame):
+        irt = irt_file
+    else:
+        print("irt_file must be a path to an irt table or a pd.DataFrame object.")
+        sys.exit()
 
     ev = evidence.loc[:, ["id", "Ion mobility index"]]
     ev = ev.rename(columns = {'id':'Evidence ID'})
