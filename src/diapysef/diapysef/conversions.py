@@ -5,16 +5,21 @@ import pandas as pd
 import statsmodels.formula.api as sm
 import numpy as np
 from statsmodels.graphics.regressionplots import abline_plot
+from matplotlib.backends.backend_pdf import PdfPages
 
-def calibrate(data, plot = True):
+def calibrate(data, plot = True, pdf = "rtcalibration"):
     """Fits a linear model to the irts"""
+    filename = data.iloc[0,0]
     mod = sm.ols(formula = 'irt ~ rt', data = data)
     res = mod.fit()
     # scatter-plot data
     ax = data.plot(x='rt', y='irt', kind='scatter')
     a = abline_plot(model_results=res, ax=ax)
-    a.savefig("irtfit_%s.pdf" % data.iloc[0,0])
-    return [data.iloc[0,0], res.params.Intercept, res.params.rt]
+    # print(res.rsquared)
+    a.suptitle("%s \n R2: %s \n R2adj: %s" % (filename, res.rsquared, res.rsquared_adj), fontsize = 10)
+    # text(0.9, 0.1,("R2:"), ha='center', va='center', transform=ax.transAxes)
+    a.savefig(pdf, format = 'pdf')
+    return [filename, res.params.Intercept, res.params.rt]
     # row = np.array([['raw', 'intercept', 'slope'], [data.iloc[0,0], res.params.Intercept, res.params.rt]])
     # return pd.DataFrame(data = row[1:,], columns = row[0,0:])
 
@@ -22,7 +27,7 @@ def pasef_to_tsv(evidence, msms, irt_file):
     """Converts a mq output to a library taking a best replicate approach."""
     if isinstance(irt_file, str):
         irt = pd.read_table(irt_file)
-    elif isinstance(irt, pd.DataFrame):
+    elif isinstance(irt_file, pd.DataFrame):
         irt = irt_file
     else:
         print("irt_file must be a path to an irt table or a pd.DataFrame object.")
@@ -61,9 +66,11 @@ def pasef_to_tsv(evidence, msms, irt_file):
     # Generate the iRT calibrators
     raw_files = msms_irt.raw.unique()
     calibrators = []
+    pp = PdfPages('rtcalibration.pdf')
     for file in raw_files:
-        cal = calibrate(msms_irt[msms_irt.raw == file])
+        cal = calibrate(msms_irt[msms_irt.raw == file], pdf = pp)
         calibrators.append(cal)
+    pp.close()
 
     # Apply rt calibrators
     calibrators = pd.DataFrame(columns = ['Raw file', 'intercept', 'slope'], data = calibrators)
@@ -78,7 +85,6 @@ def pasef_to_tsv(evidence, msms, irt_file):
     df1 = pd.concat([masses, intensities], axis = 1, keys = ['Masses', 'Intensities'])
     msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
     msl2 = msl2.join(df1).reset_index(drop = True)
-    msl2 = pd.concat([msl, masses, intensities], axis = 1)
     msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","Tr_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
     msl2['decoy'] = 0
     msl2['transition_name'] = ['_'.join(str(i) for i in z) for z in zip(msl2.transition_group_id,msl2.PrecursorMz,msl2.ProductMz)]
