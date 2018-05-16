@@ -19,11 +19,12 @@ def calibrate(data, plot = True, pdf = "rtcalibration"):
     a.suptitle("%s \n R2: %s \n R2adj: %s" % (filename, res.rsquared, res.rsquared_adj), fontsize = 10)
     # text(0.9, 0.1,("R2:"), ha='center', va='center', transform=ax.transAxes)
     a.savefig(pdf, format = 'pdf')
+    matplotlib.pyplot.close()
     return [filename, res.params.Intercept, res.params.rt]
     # row = np.array([['raw', 'intercept', 'slope'], [data.iloc[0,0], res.params.Intercept, res.params.rt]])
     # return pd.DataFrame(data = row[1:,], columns = row[0,0:])
 
-def pasef_to_tsv(evidence, msms, irt_file):
+def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_column = 'Ion mobility index'):
     """Converts a mq output to a library taking a best replicate approach."""
     if isinstance(irt_file, str):
         irt = pd.read_table(irt_file)
@@ -33,8 +34,9 @@ def pasef_to_tsv(evidence, msms, irt_file):
         print("irt_file must be a path to an irt table or a pd.DataFrame object.")
         sys.exit()
 
-    ev = evidence.loc[:, ["id", "Ion mobility index"]]
+    ev = evidence.loc[:, ["id", im_column]]
     ev = ev.rename(columns = {'id':'Evidence ID'})
+    ev = ev.rename(columns = {im_column:'Ion mobility index'})
     ms = pd.merge(msms, ev, on = 'Evidence ID')
 
     # Replace modifications in the MQ output so that they are OpenMS readable
@@ -66,7 +68,7 @@ def pasef_to_tsv(evidence, msms, irt_file):
     # Generate the iRT calibrators
     raw_files = msms_irt.raw.unique()
     calibrators = []
-    pp = PdfPages('rtcalibration.pdf')
+    pp = PdfPages(pdfout)
     for file in raw_files:
         cal = calibrate(msms_irt[msms_irt.raw == file], pdf = pp)
         calibrators.append(cal)
