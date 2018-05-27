@@ -14,7 +14,7 @@ try:
     else:
         raise Exception("Unsupported platform.")
 
-    dll = cdll.LoadLibrary(libname)
+    dll = cdll.LoadLibrary(os.path.realpath(libname))
     dll.tims_open.argtypes = [ c_char_p, c_uint32 ]
     dll.tims_open.restype = c_uint64
     dll.tims_close.argtypes = [ c_uint64 ]
