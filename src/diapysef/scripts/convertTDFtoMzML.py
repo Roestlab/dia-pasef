@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
+
 """Conversion program to convert a Bruker TIMS file to a single mzML
 
 """
@@ -189,9 +190,10 @@ class MergeConsumer():
         """
         Cleanup: write all stored spectra to disk
         """
-        for k, v in self._spectrum_storage.iteritems():
-            merge_spec = self._mergeSpectra(v)
-            self._internal_consumer.consumeSpectrum(merge_spec)
+        for k, v in self._spectrum_storage.items():
+            if v:
+                merge_spec = self._mergeSpectra(v)
+                self._internal_consumer.consumeSpectrum(merge_spec)
 
     def consumeSpectrum(self, s):
         """
