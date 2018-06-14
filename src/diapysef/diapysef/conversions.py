@@ -38,12 +38,13 @@ def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_colu
     ev = ev.rename(columns = {'id':'Evidence ID'})
     ev = ev.rename(columns = {im_column:'Ion mobility index'})
     ms = pd.merge(msms, ev, on = 'Evidence ID')
+    ms = ms.dropna(subset=["Retention time"]) # Some precursors in MQ are not annotated with a RT
 
     # Replace modifications in the MQ output so that they are OpenMS readable
     ms['Modified sequence'] = ms['Modified sequence'].str.replace('_', '')
     ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ox)","Oxidation")
     ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ph)","Phospho")
-    ms['Modified sequence'] = ms['Modified sequence'].str.replace("C","C\\(Carbamidomethyl\\)")
+    ms['Modified sequence'] = ms['Modified sequence'].str.replace("C","C(Carbamidomethyl)")
     ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ac)","Acetylation")
     ms = ms.rename(columns = {'Modified sequence':'ModifiedPeptideSequence'})
 
@@ -53,7 +54,7 @@ def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_colu
         irt = irt.drop_duplicates()
 
     irt.columns = ["sequence","irt"]
-    irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:4\\)","C\\(Carbamidomethyl\\)")
+    irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:4\\)","C(Carbamidomethyl)")
     irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:1\\)","Acetylation")
     irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:35\\)","Oxidation")
     irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:21\\)","Phospho")
@@ -78,7 +79,9 @@ def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_colu
     calibrators = pd.DataFrame(columns = ['Raw file', 'intercept', 'slope'], data = calibrators)
     ms = pd.merge(ms, calibrators, on = 'Raw file')
     ms['irt'] = ms.intercept + ms.slope * ms['Retention time']
-    ms = ms.loc[ms.groupby(["ModifiedPeptideSequence"])['PEP'].idxmin()]
+
+    # Filter for best identification (lowest PEP)
+    ms = ms.loc[ms.groupby(["ModifiedPeptideSequence", "Charge"])['PEP'].idxmin()]
 
     # Shape data for AssayGenerator
     msl = ms.loc[:, ["id","m/z","Masses","Charge","irt", "Ion mobility index", "Intensities","Sequence","ModifiedPeptideSequence","Proteins"]]
@@ -88,11 +91,15 @@ def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_colu
     msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
     msl2 = msl2.join(df1).reset_index(drop = True)
     msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","Tr_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
+    # Reorder the columns as they are in libraries generated with the OSW assay generator
+    msl2 = msl2[["transition_group_id","PrecursorMz","ProductMz","PrecursorCharge","Tr_recalibrated","LibraryIntensity","PeptideSequence","FullUniModPeptideName","ProteinName", "PrecursorIonMobility"]]
     msl2['decoy'] = 0
     msl2['transition_name'] = ['_'.join(str(i) for i in z) for z in zip(msl2.transition_group_id,msl2.PrecursorMz,msl2.ProductMz)]
 
+    msl2=msl2.drop_duplicates()
     # Write output
-    # msl2.to_csv("pasefLib.tsv", sep = "\t")
+    # msl2.to_csv("pasefLib.tsv", sep = "\t", index=False)
+
     return(msl2)
 
 # @TODO call the OpenSwathAssayGenerator with pyopenms
