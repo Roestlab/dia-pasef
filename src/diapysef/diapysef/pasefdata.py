@@ -4,6 +4,7 @@ import os, sys
 import pandas as pd
 import numpy as np
 import sqlite3
+from .timsdata import TimsData
 
 class PasefMQData:
 
@@ -53,27 +54,67 @@ class PasefMQData:
             print("Msms and evidence need to be present for library generation")
             sys.exit()
 
-class PasefData:
+class PasefData(TimsData):
 
-    def __init__ (self, analysis_directory):
-        if sys.version_info.major == 2:
-            if not isinstance(analysis_directory, unicode):
-                raise ValueError("analysis_directory must be a Unicode string.")
-        if sys.version_info.major == 3:
-            if not isinstance(analysis_directory, str):
-                raise ValueError("analysis_directory must be a string.")
+    # def __init__ (self, analysis_directory):
+    #     if sys.version_info.major == 2:
+    #         if not isinstance(analysis_directory, unicode):
+    #             raise ValueError("analysis_directory must be a Unicode string.")
+    #     if sys.version_info.major == 3:
+    #         if not isinstance(analysis_directory, str):
+    #             raise ValueError("analysis_directory must be a string.")
 
-        self.conn = sqlite3.connect(os.path.join(analysis_directory, "analysis.tdf"))
+    #     self.conn = sqlite3.connect(os.path.join(analysis_directory, "analysis.tdf"))
 
-    def get_conversion_func(self):
-        q = self.conn.execute("SELECT * FROM TimsCalibration")
-        calib = q.fetchone()
-        def convert_im(im):
-            im = np.array(im)
-            return(1/(calib[8]+calib[9]/(calib[4]+((calib[5]-calib[4])/calib[3])*(im-calib[6]-calib[2]))))
-        # Mobility[1/k0] = 1/(c6+c7/(c2+((c3-c2)/c1)*(scanno-c4-c0)))
-        return convert_im
+    # def get_conversion_func(self):
+    #     q = self.conn.execute("SELECT * FROM TimsCalibration")
+    #     calib = q.fetchone()
+    #     def convert_im(im):
+    #         im = np.array(im)
+    #         return(1/(calib[8]+calib[9]/(calib[4]+((calib[5]-calib[4])/calib[3])*(im-calib[6]-calib[2]))))
+    #     # Mobility[1/k0] = 1/(c6+c7/(c2+((c3-c2)/c1)*(scanno-c4-c0)))
+    #     return convert_im
 
-    def scanNumToOneOverK0 (self, mzs):
-        convert_scan_num = self.get_conversion_func()
-        return(convert_scan_num(mzs))
+    # def scanNumToOneOverK0 (self, mzs):
+    #     convert_scan_num = self.get_conversion_func()
+    #     return(convert_scan_num(mzs))
+
+    def getMetadata(self):
+        metadata = pd.read_sql(" SELECT * FROM Frames JOIN PasefFrameMsMsInfo ON Frames.Id = PasefFrameMsMsInfo.Frame JOIN Precursors ON PasefFrameMsMsInfo.Precursor = Precursors.Id" , self.conn)
+        self.metadata = metadata
+
+    def filterMetadata(self,
+                       imstart=None,
+                       imend=None,
+                       mzstart=None,
+                       mzend=None,
+                       rtstart=None,
+                       rtend=None,
+                       charge=None,
+                       metadata=None):
+        if metadata is None:
+            if self.metadata is None:
+                self.getMetadata()
+            metadata = self.metadata
+            # metadata = pd.read_sql(" SELECT * FROM Frames JOIN PasefFrameMsMsInfo ON Frames.Id = PasefFrameMsMsInfo.Frame JOIN Precursors ON PasefFrameMsMsInfo.Precursor = Precursors.Id" , conn)
+
+        if mzstart is not None:
+            scans_filt = metadata[metadata['MonoisotopicMz'] >= mzstart]
+        else:
+            scans_filt = metadata
+        if mzend is not None:
+            scans_filt = scans_filt[scans_filt['MonoisotopicMz'] <= mzend]
+        if imstart is not None:
+            scans_filt = scans_filt[scans_filt['ScanNumBegin'] <= imstart]
+        if imend is not None:
+            scans_filt = scans_filt[scans_filt['ScanNumEnd'] >= imend]
+        if rtstart is not None:
+            scans_filt = scans_filt[scans_filt['Time'] >= rtstart]
+        if rtend is not None:
+            scans_filt = scans_filt[scans_filt['Time'] <= rtend]
+        if charge is not None:
+            scans_filt = scans_filt[scans_filt['Charge'] == charge]
+        return(scans_filt)
+
+        
+

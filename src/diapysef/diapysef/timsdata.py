@@ -59,25 +59,6 @@ except OSError:
 
 class TimsData:
 
-    def get_cycle_length (self, pasef_ms2_id = 8):
-        firstcycle = True
-        initial_ms1 = True
-        cycle_length = 0
-        row = 1
-        while (firstcycle):
-            mstype = self.conn.execute("SELECT MsMsType FROM Frames LIMIT {0},1".format(row)).fetchone()
-            row += 1
-            if mstype[0] == pasef_ms2_id:
-                cycle_length += 1
-                initial_ms1 = False
-            elif(initial_ms1 != True):
-                firstcycle = False
-        return cycle_length
-
-    def get_windows_per_frame(self, pasef_ms2_id = 8):
-        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType=%d AND Frame = (SELECT MIN(Frame) FROM PasefFrameMsMsInfo as fr)" % pasef_ms2_id)
-        windows = q.fetchall()
-        return len(windows)
 
     def get_conversion_func(self):
         q = self.conn.execute("SELECT * FROM TimsCalibration")
@@ -88,20 +69,6 @@ class TimsData:
             return(1/(calib[8]+calib[9]/(calib[4]+((calib[5]-calib[4])/calib[3])*(im-calib[6]-calib[2]))))
         # Mobility[1/k0] = 1/(c6+c7/(c2+((c3-c2)/c1)*(scanno-c4-c0)))
         return convert_im
-
-    def get_windows(self):
-        """Extracts the window scheme from the first cycle of a tims file"""
-        pasef_ms2_id = 8 # diaPASEF ms2 scans are denoted by 8 instead of 2
-        cycle_length = self.get_cycle_length(pasef_ms2_id)
-        wpf = self.get_windows_per_frame(pasef_ms2_id)
-        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType=%d LIMIT %d" % (pasef_ms2_id, cycle_length*wpf))
-        frames = q.fetchall()
-        colnames = [description[0] for description in q.description]
-        resframe = pd.DataFrame(data = frames, columns = colnames)
-        # Currently the frame does not matter for the conversion, thus we can set it to 1
-        resframe["IMstart"] = self.scanNumToOneOverK0(1, resframe.ScanNumBegin)
-        resframe["IMend"] = self.scanNumToOneOverK0(1, resframe.ScanNumEnd)
-        return resframe
 
     if sdk:
 
@@ -201,6 +168,23 @@ class TimsData:
 
             return result
 
+        def readSpectrum (self, frame_id, scan_begin, scan_end):
+
+            scans = self.readScans(frame_id, scan_begin, scan_end)
+            # Summarize on a grid
+            allind = []
+            allint = []
+            for scan in scans:
+                indices = np.array(scan[0])
+                if len(indices) > 0:
+                    # summed_intensities = np.zeros(indices.max() + 1)
+                    intens = scan[1]
+                    allind = np.concatenate((allind, indices))
+                    allint = np.concatenate((allint, intens))
+                    # summed_intensities[indices] += intens
+            allmz = self.indexToMz(frame_id, allind)
+            return((allmz, allint))
+
     else:
 
         def __init__ (self, analysis_directory, use_recalibrated_state=False):
@@ -216,3 +200,39 @@ class TimsData:
         def scanNumToOneOverK0 (self, frame_id, mzs):
             convert_scan_num = self.get_conversion_func()
             return(convert_scan_num(frame_id, mzs))
+
+class DiaPasefData(TimsData):
+
+    def get_cycle_length (self, pasef_ms2_id = 8):
+        firstcycle = True
+        initial_ms1 = True
+        cycle_length = 0
+        row = 1
+        while (firstcycle):
+            mstype = self.conn.execute("SELECT MsMsType FROM Frames LIMIT {0},1".format(row)).fetchone()
+            row += 1
+            if mstype[0] == pasef_ms2_id:
+                cycle_length += 1
+                initial_ms1 = False
+            elif(initial_ms1 != True):
+                firstcycle = False
+        return cycle_length
+
+    def get_windows_per_frame(self, pasef_ms2_id = 8):
+        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType=%d AND Frame = (SELECT MIN(Frame) FROM PasefFrameMsMsInfo as fr)" % pasef_ms2_id)
+        windows = q.fetchall()
+        return len(windows)
+
+    def get_windows(self):
+        """Extracts the window scheme from the first cycle of a tims file"""
+        pasef_ms2_id = 8 # diaPASEF ms2 scans are denoted by 8 instead of 2
+        cycle_length = self.get_cycle_length(pasef_ms2_id)
+        wpf = self.get_windows_per_frame(pasef_ms2_id)
+        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType=%d LIMIT %d" % (pasef_ms2_id, cycle_length*wpf))
+        frames = q.fetchall()
+        colnames = [description[0] for description in q.description]
+        resframe = pd.DataFrame(data = frames, columns = colnames)
+        # Currently the frame does not matter for the conversion, thus we can set it to 1
+        resframe["IMstart"] = self.scanNumToOneOverK0(1, resframe.ScanNumBegin)
+        resframe["IMend"] = self.scanNumToOneOverK0(1, resframe.ScanNumEnd)
+        return resframe

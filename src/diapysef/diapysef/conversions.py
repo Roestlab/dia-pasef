@@ -24,6 +24,9 @@ def calibrate(data, plot = True, pdf = "rtcalibration"):
     # row = np.array([['raw', 'intercept', 'slope'], [data.iloc[0,0], res.params.Intercept, res.params.rt]])
     # return pd.DataFrame(data = row[1:,], columns = row[0,0:])
 
+def get_product_charge(msl, msms):
+    return(msl)
+
 def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_column = 'Ion mobility index'):
     """Converts a mq output to a library taking a best replicate approach."""
     if isinstance(irt_file, str):
@@ -34,9 +37,9 @@ def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_colu
         print("irt_file must be a path to an irt table or a pd.DataFrame object.")
         sys.exit()
 
-    ev = evidence.loc[:, ["id", im_column]]
+    ev = evidence.loc[:, ["id", "Calibrated Retention Time", "Ion mobility index", im_column]]
     ev = ev.rename(columns = {'id':'Evidence ID'})
-    ev = ev.rename(columns = {im_column:'Ion mobility index'})
+    ev = ev.rename(columns = {im_column:'imcol'})
     ms = pd.merge(msms, ev, on = 'Evidence ID')
     ms = ms.dropna(subset=["Retention time"]) # Some precursors in MQ are not annotated with a RT
 
@@ -78,19 +81,23 @@ def pasef_to_tsv(evidence, msms, irt_file, pdfout = "rtcalibration.pdf", im_colu
     # Apply rt calibrators
     calibrators = pd.DataFrame(columns = ['Raw file', 'intercept', 'slope'], data = calibrators)
     ms = pd.merge(ms, calibrators, on = 'Raw file')
-    ms['irt'] = ms.intercept + ms.slope * ms['Retention time']
+    ms['irt'] = ms.intercept + ms.slope * ms['Calibrated Retention Time']
 
     # Filter for best identification (lowest PEP)
     ms = ms.loc[ms.groupby(["ModifiedPeptideSequence", "Charge"])['PEP'].idxmin()]
+    # Filter decoy peptides
+    ms = ms[ms['Reverse'].isna()]
 
     # Shape data for AssayGenerator
-    msl = ms.loc[:, ["id","m/z","Masses","Charge","irt", "Ion mobility index", "Intensities","Sequence","ModifiedPeptideSequence","Proteins"]]
+    msl = ms.loc[:, ["id","m/z","Masses","Charge","irt", "imcol", "Intensities","Sequence","ModifiedPeptideSequence","Proteins"]]
     masses = msl['Masses'].str.split(';', expand = True).stack().str.strip().reset_index(level = 1, drop=True)
     intensities = msl['Intensities'].str.split(';', expand = True).stack().str.strip().reset_index(level = 1, drop=True)
     df1 = pd.concat([masses, intensities], axis = 1, keys = ['Masses', 'Intensities'])
     msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
     msl2 = msl2.join(df1).reset_index(drop = True)
     msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","Tr_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
+    msl2 = get_product_charge(msl2, msms)
+
     # Reorder the columns as they are in libraries generated with the OSW assay generator
     msl2 = msl2[["transition_group_id","PrecursorMz","ProductMz","PrecursorCharge","Tr_recalibrated","LibraryIntensity","PeptideSequence","FullUniModPeptideName","ProteinName", "PrecursorIonMobility"]]
     msl2['decoy'] = 0

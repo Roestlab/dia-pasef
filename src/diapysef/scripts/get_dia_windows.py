@@ -15,7 +15,7 @@ if len(sys.argv) < 3:
 experiment = sys.argv[1]
 outfile = sys.argv[2]
 
-dia = TimsData(experiment)
+dia = DiaPasefData(experiment)
 windows = dia.get_windows()
 
 windows.to_csv(outfile)
