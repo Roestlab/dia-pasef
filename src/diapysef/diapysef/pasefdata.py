@@ -43,10 +43,10 @@ class PasefMQData:
     def annotate_ion_mobility (self, pasef_data):
         """Adds ion mobility colums to the maxquant results that are currently loaded."""
         if hasattr(self, 'all_peptides'):
-            self.all_peptides['IonMobilityIndexK0'] = pasef_data.scanNumToOneOverK0(self.all_peptides['Ion mobility index'])
+            self.all_peptides['IonMobilityIndexK0'] = pasef_data.scanNumToOneOverK0(1,self.all_peptides['Ion mobility index'])
 
         if hasattr(self, 'evidence'):
-            self.evidence['IonMobilityIndexK0'] = pasef_data.scanNumToOneOverK0(self.evidence['Ion mobility index'])
+            self.evidence['IonMobilityIndexK0'] = pasef_data.scanNumToOneOverK0(1,self.evidence['Ion mobility index'])
     def convert_to_lib(self, irt_file):
         if hasattr(self, 'msms') & hasattr(self, 'evidence'):
             pasef_to_lib(self.evidence, self.msms, irt_file)
