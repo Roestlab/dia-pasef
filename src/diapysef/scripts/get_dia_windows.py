@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
-from diapysef.timsdata import TimsData
+from diapysef.timsdata import DiaPasefData
 import sys
 import pandas as pd
 """
