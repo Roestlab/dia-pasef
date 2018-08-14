@@ -24,6 +24,5 @@ setup(name='diapysef',
       scripts=['scripts/get_dia_windows.py',
                'scripts/annotate_mq_ionmobility.py',
                'scripts/plot_dia_windows.py',
-               'scripts/convertTDFtoMzML.py',
-               'scripts/convertMQtoTSV.py'],
+               'scripts/convertTDFtoMzML.py'],
       zip_safe=False)
