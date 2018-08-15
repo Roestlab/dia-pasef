@@ -322,11 +322,17 @@ def main():
             cfg.linear_fp_mass_acc = -1; # set the desired RT accuracy in seconds
             opt.setNumpressConfigurationMassTime(cfg)
             cfg = pyopenms.NumpressConfig()
-            cfg = pyopenms.NumpressConfig()
             cfg.estimate_fixed_point = True
             cfg.numpressErrorTolerance = -1.0 # skip check, faster
             cfg.setCompression(b"slof");
             opt.setNumpressConfigurationIntensity(cfg)
+            opt.setCompression(True) # zlib compression
+            consumer.setOptions(opt)
+            cfg = pyopenms.NumpressConfig()
+            cfg.estimate_fixed_point = True
+            cfg.numpressErrorTolerance = -1.0 # skip check, faster
+            cfg.setCompression(b"slof");
+            opt.setNumpressConfigurationFloatDataArray(cfg)
             opt.setCompression(True) # zlib compression
             consumer.setOptions(opt)
         except Exception:
