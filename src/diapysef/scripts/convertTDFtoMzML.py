@@ -111,6 +111,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
                     print("Switch to new scan at", k, "with mapping", scandata)
 
                 sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
+                sframe.setNativeID("frame=%s_scan=%s" % (frame_id, next_scan_switch) )
                 exp.consumeSpectrum(sframe)
                 allmz = []
                 allint = []
@@ -133,6 +134,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         s.setMSLevel(mslevel)
         s.set_peaks( (mz, intens) ) 
         s.setRT(time)
+        s.setNativeID("frame=%s spec %s" % (frame_id, k) )
         p = pyopenms.Precursor()
         p.setDriftTime(drift_time)
         if mslevel == 2:
@@ -144,6 +146,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
 
     if compressFrame and next_scan_switch == -1:
         sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
+        sframe.setNativeID("frame=%s" % frame_id)
         exp.consumeSpectrum(sframe)
 
 def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width):
