@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='diapysef',
-      version='0.1',
+      version='0.2',
       description='Analysis and visualization of DIA PASEF data',
       long_description=readme(),
       author='Max Frank, Hannes Roest',
@@ -24,6 +24,5 @@ setup(name='diapysef',
       scripts=['scripts/get_dia_windows.py',
                'scripts/annotate_mq_ionmobility.py',
                'scripts/plot_dia_windows.py',
-               'scripts/convertTDFtoMzML.py',
-               'scripts/convertMQtoTSV.py'],
+               'scripts/convertTDFtoMzML.py'],
       zip_safe=False)
