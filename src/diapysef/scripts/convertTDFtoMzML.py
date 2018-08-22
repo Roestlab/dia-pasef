@@ -10,7 +10,7 @@ import sqlite3
 import time
 import pyopenms
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from ctypes import cdll
 
 import diapysef.timsdata
@@ -354,7 +354,8 @@ def main():
 
     for frame_id in range(lower_frame, upper_frame):
         store_frame(frame_id+1, td, conn, consumer, compressFrame=True, verbose=False)
-
+    
+    print("Conversion completed, press Enter to continue.")
 if __name__ == "__main__":
     main()
 
