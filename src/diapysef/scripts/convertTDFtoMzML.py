@@ -354,7 +354,8 @@ def main():
 
     for frame_id in range(lower_frame, upper_frame):
         store_frame(frame_id+1, td, conn, consumer, compressFrame=True, verbose=False)
-
+    
+    print("Conversion completed, press Enter to continue.")
 if __name__ == "__main__":
     main()
 
