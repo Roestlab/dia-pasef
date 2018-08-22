@@ -10,7 +10,7 @@ import sqlite3
 import time
 import pyopenms
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from ctypes import cdll
 
 import diapysef.timsdata
