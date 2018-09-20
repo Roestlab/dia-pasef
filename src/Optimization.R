@@ -162,24 +162,33 @@ plot_window_settings <- function(ow, data_long, swathpertims, im_start=imcutstar
 }
 
 optimize_window_overlaps <- function(ow, data_long){
+  # Parameters:
+  #   ow            list        list of optimized window frames from Optimize_IM_Window()
+  #   data_long   dataframe     filtered and cleaned data of the im
   wins <- copy(ow)
   wins$imcutstart <- 0
   wins$imcutend <- 0
   wins[cycle==1,]$imcutstart <- 150
-  for (i in unique(wins$group)) {
-    #isolate the windows by frame (group)
-    frames <- wins[wins$group == i,] # gives a list of windows in the first frame
+  for(i in unique(wins$group)){
+    # isolate the windows by frame (group)
+    frames <- wins[wins$group == i,] #assigns the list of windows for the first frame
     j <- 1
-    while( j < length(frames$window)) {
-      mz1 <- density(df[mz > frames$mzstart[j] & mz < frames$mzend[j]]$im)
-      mz2 <- density(df[mz > frames$mzstart[j+1] & mz < frames$mzend[j+1]]$im)
-      windiff <- mz1$y - mz2$y
-      intersection <- mz1$x[which(diff(windiff > 0) != 0) + 1]
-      wins[wins$group==i, ]$imcutend[j] <- intersection[1]
-      wins[wins$group == i,]$imcutstart[j+1] <- intersection[1]
-      j <- j + 1
+    while(j < length(frames$window)){
+      mz1 <- df[mz > frames$mzstart[j] & mz < frames$mzend[j]]$im
+      mz2 <- df[mz > frames$mzstart[j+1] & mz < frames$mzend[j+1]]$im
+      # calculate the kernel density for each swath window
+      d1 <- density(mz1, from=min(mz1), to=max(mz2), n=2048)
+      d2 <- density(mz2, from=min(mz1), to=max(mz2), n=2048)
+      # find the intersection points
+      inter <- d1$x[as.logical(abs(diff(d1$y < d2$y)))]
+      # the maximum would be the last cutoff for intersection between 2 populations
+      v <- length(d1$x[as.logical(abs(diff(d1$y < d2$y)))])
+      wins[wins$group==i,]$imcutend[j] <- inter[v]
+      wins[wins$group==i,]$imcutstart[j+1] <- inter[v]
+      j <- j+1
     }
-    wins[wins$group == i,]$imcutend[j] <- (wins[wins$group == i,]$imcutstart[j] + 150)
+    # assign the im end with the fixed endings
+    wins[wins$group == i,]$imcutend[j] <- 850
   }
   return(wins)
 }
