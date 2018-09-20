@@ -133,7 +133,7 @@ optimizeIMwindows <- function(data_long, window_mz, minim, maxim, swathpertims, 
 }
 
 
-plot_window_settings <- function(ow, data_long, swathpertims, im_start=imcutstart, im_end=imcutend){
+plot_window_settings <- function(ow, data_long, swathpertims){
   # Parameters:
   #   ow            list            list of window settings
   #   data_long     dataframe       binned ms data
@@ -145,9 +145,9 @@ plot_window_settings <- function(ow, data_long, swathpertims, im_start=imcutstar
   mzmax <- 1200
   mzmin <- 400
   d <- data.frame(x1 = ow$mzstart, 
-                  y1 = ow$imcutstart)
+                  y1 = ow$imstart)
   d$x2 = ow$mzend
-  d$y2 = ow$imcutend
+  d$y2 = ow$imend
   d$name <- rep(1:(swathes/swathpertims), swathpertims)
   cyclebounds <- mzmin + ((mzmax - mzmin) / swathpertims) * 0: swathpertims
   
@@ -176,22 +176,20 @@ optimize_window_overlaps <- function(ow, data_long){
     while(j < length(frames$window)){
       mz1 <- df[mz > frames$mzstart[j] & mz < frames$mzend[j]]$im
       mz2 <- df[mz > frames$mzstart[j+1] & mz < frames$mzend[j+1]]$im
-      # calculate the kernel density for each swath window
       d1 <- density(mz1, from=min(mz1), to=max(mz2), n=2048)
       d2 <- density(mz2, from=min(mz1), to=max(mz2), n=2048)
-      # find the intersection points
       inter <- d1$x[as.logical(abs(diff(d1$y < d2$y)))]
       # the maximum would be the last cutoff for intersection between 2 populations
-      v <- length(d1$x[as.logical(abs(diff(d1$y < d2$y)))])
-      wins[wins$group==i,]$imcutend[j] <- inter[v]
-      wins[wins$group==i,]$imcutstart[j+1] <- inter[v]
+      v <- max(inter)
+      wins[wins$group==i,]$imcutend[j] <- v
+      wins[wins$group==i,]$imcutstart[j+1] <- v
       j <- j+1
     }
-    # assign the im end with the fixed endings
     wins[wins$group == i,]$imcutend[j] <- 850
   }
   return(wins)
 }
+
 
 ##############################
 ## Data import
@@ -209,6 +207,7 @@ data_long <- binColumn(data_long, "mz", 1)
 
 
 
+
 swathpertims <- 4
 ran <- seq((maxim-minim)/swathpertims - 60, (maxim-minim)/swathpertims, by =3)
 win <- lapply(ran, function(x){
@@ -222,12 +221,14 @@ ow <- win[[which.max(coverage)]]
 plot_window_settings(ow, data_long, swathpertims)
 max(coverage) *100
 
-
-
-
 im_span <- optimize_window_overlaps(ow, data_long)
+im_new <- subset(im_span, select=-c(imstart,imend))
+colnames(im_new)[6:7] <- c("imstart","imend")
 
-plot_window_settings(im_span, data_long, swathpertims, im_start = imcutstart,im_end = imcutend)
+plot_window_settings(im_new, data_long, swathpertims)
 
-
+getCoverage(data_long, im_new)
+# 0.869917
+getCoverage(data_long,ow)
+#0.865293
 
