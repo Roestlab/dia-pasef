@@ -148,6 +148,9 @@ cirts <- fread(irt)
 fracLib <- fracLib[fracLib[,.I[which.min(PEP)], by= c("Charge", "Modified sequence", "Raw file")]$V1]
 # Record the protein names and the id numbers
 ProteinNames <- subset(fracLib, select=c(`V1`, `Protein names`))
+# Clean up the protein names and remove all the \t
+ProteinNames$`Protein names` <- gsub("\t", "", ProteinNames$`Protein names`)
+
 # Remove the protein names column to avoid extra tabs
 fracLib <- subset(fracLib, select= -`Protein names`)
 
