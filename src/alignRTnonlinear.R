@@ -143,6 +143,8 @@ alignFraction <- function(lib_fr, pirt, holdout_size=0.1,
 
 
 fracLib <- fread(evidence)
+ProteinNames <- fracLib$`Protein names`
+fracLib <- subset(fracLib, select=`Protein names`)
 cirts <- fread(irt)
 fracLib <- fracLib[fracLib[,.I[which.min(PEP)], by= c("Charge", "Modified sequence", "Raw file")]$V1]
 files <- unique(fracLib$`Raw file`)
@@ -152,4 +154,4 @@ fr <- alignFraction(lib, pirt = cirts, optimization_criterion = "gcv", PDF=NULL)
 
 libAnn <- alignFractions(fracLib, pirt = cirts, optimizeSpan = "always", pdfout = pdfout)
 
-write.table(libAnn, outfile, row.names = F, quote = F, sep = "\t")
+write.table(libAnn, outfile, row.names = F, quote = T, sep = "\t")
