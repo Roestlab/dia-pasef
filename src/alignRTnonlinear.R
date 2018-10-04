@@ -143,15 +143,23 @@ alignFraction <- function(lib_fr, pirt, holdout_size=0.1,
 
 
 fracLib <- fread(evidence)
-ProteinNames <- fracLib$`Protein names`
-fracLib <- subset(fracLib, select=`Protein names`)
 cirts <- fread(irt)
+# sort the data by PEP
 fracLib <- fracLib[fracLib[,.I[which.min(PEP)], by= c("Charge", "Modified sequence", "Raw file")]$V1]
-files <- unique(fracLib$`Raw file`)
+# Record the protein names and the id numbers
+ProteinNames <- subset(fracLib, select=c(`V1`, `Protein names`))
+# Remove the protein names column to avoid extra tabs
+fracLib <- subset(fracLib, select= -`Protein names`)
 
+# Testing run with one sample run
+files <- unique(fracLib$`Raw file`)
 lib <- fracLib[`Raw file` == files[10]]
 fr <- alignFraction(lib, pirt = cirts, optimization_criterion = "gcv", PDF=NULL)
 
+# Alignment for the entire file and all runs
 libAnn <- alignFractions(fracLib, pirt = cirts, optimizeSpan = "always", pdfout = pdfout)
+
+# Merge the protein names back with the aligned library by their id number
+libAnn <- merge(libAnn, ProteinNames, by="V1")
 
 write.table(libAnn, outfile, row.names = F, quote = T, sep = "\t")
