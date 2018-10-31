@@ -25,6 +25,21 @@ def calibrate(data, plot = True, pdf = "rtcalibration"):
     # row = np.array([['raw', 'intercept', 'slope'], [data.iloc[0,0], res.params.Intercept, res.params.rt]])
     # return pd.DataFrame(data = row[1:,], columns = row[0,0:])
 
+def outliers(data, tolerance = 7):
+    '''
+    (dataframe, int) -> list of dataframe & list of outliers indices
+
+    Identify outlier indices for lowess alignment.
+    Returns a pandas dataframe wwith outliers removed
+    '''
+    filename = data.iloc[0,0]
+    mod = sm.ols(formula = 'irt ~rt', data = data)
+    res = mod.fit()
+    absd = abs(res.resid) # get the absolute s.d. for each point from linear regression
+    outliers = data[absd > 7].index #get the index of the outliers
+    data1 = data.drop(outliers)
+    return [data1,outliers]
+
 def get_product_charge(msl, msms):
     return(msl)
 
@@ -32,7 +47,8 @@ def pasef_to_tsv(evidence, msms,
                  irt_file = None,
                  pdfout = "rtcalibration.pdf",
                  im_column = 'Ion mobility index',
-                 rt_alignment = 'linear',
+                 rt_alignment = 'nonlinear',
+		 remove_outliers = None,
                  im_alignment = 'linear'):
     """Converts a mq output to a library taking a best replicate approach."""
 
@@ -94,6 +110,43 @@ def pasef_to_tsv(evidence, msms,
                 ms = pd.merge(ms, calibrators, on = 'Raw file')
                 ms['irt'] = ms.intercept + ms.slope * ms['Calibrated retention time']
                 ms = ms.drop(columns=['intercept', 'slope'])
+
+            elif rt_alignment is 'nonlinear':
+                # make a df to store the fitted values for merging later
+                msms_nrt = pd.DataFrame(columns =['raw', 'sequence', 'rt', 'im', 'charge', 'irt', 'iim', 'NormalizedRetentionTime'])
+                for file in raw_files:
+                    msms_irt_sub = msms_irt[msms_irt.raw == file]
+                    # does not need to remove outliers
+                    # span for the lowess interpolation is 1% of the range
+                    if remove_outliers == True:
+                        y = func.outliers(msms_irt_sub) # returns a df without the outliers and a list of outliers indices
+                        msms_irt_sub['NormalizedRetentionTime'] = 0
+                        msms_irt_sub.loc[y[1], 'NormalizedRetentionTime'] = np.nan
+
+                        delta = (max(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['rt']) - min(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['rt'])) * 0.01
+                        if len(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]) < 100:
+                            frac = 1.0
+                        else:
+                            frac = 0.1
+                        r = lowess(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['irt'], msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['rt'], delta=delta, frac=frac, return_sorted=False, it=10)
+                        msms_irt_sub.loc[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['NormalizedRetentionTime'] = pd.Series(r).values
+                        
+                    else:
+                        delta = (max(msms_irt_sub['rt'] - min(msms_irt_sub['rt'])) * 0.01 )
+                        if len(msms_irt_sub) < 100:
+                            frac = 1.0 # take the fraction of data to generate the weighted fitting
+                        else:
+                            frac = 0.1
+                        # lowess fits by y/x
+                        r = lowess(msms_irt_sub['irt'], msms_irt_sub['rt'], delta=delta, frac=frac, return_sorted=False, it=10)
+                        # r is an array of the fitted values in the order of the input array
+                        msms_irt_sub['NormalizedRetentionTime'] = pd.Series(r, index=msms_irt_sub.index).values
+                        msms_nrt = msms_nrt.append(msms_irt_sub, ignore_index = True)
+                        msms_nrt = msms_nrt.drop(columns = ['im','iim'])
+                        msms_nrt.columns = ['Raw file', 'Sequence', 'Retention time', 'Charge', 'iRT', 'NormalizedRetentionTime']
+                        msms_nrt['Charge'] = msms_nrt.Charge.astype(np.int64)
+                        ms = pd.merge(ms, msms_nrt, on = ['Raw file', 'Sequence', 'Retention time', 'Charge'])          
+
             else:
                 print("Only rt_alignment='linear' is currently implemented")
                 ms['irt'] = ms['Calibrated retention time']
