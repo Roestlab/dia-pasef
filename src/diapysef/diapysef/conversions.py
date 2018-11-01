@@ -112,6 +112,8 @@ def pasef_to_tsv(evidence, msms,
                 ms = ms.drop(columns=['intercept', 'slope'])
 
             elif rt_alignment is 'nonlinear':
+                import statsmodels.api as smnonlinear
+                lowess = smnonlinear.nonparametric.lowess
                 # make a df to store the fitted values for merging later
                 msms_nrt = pd.DataFrame(columns =['raw', 'sequence', 'rt', 'im', 'charge', 'irt', 'iim', 'NormalizedRetentionTime'])
                 for file in raw_files:
