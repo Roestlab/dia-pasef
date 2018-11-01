@@ -118,7 +118,7 @@ def pasef_to_tsv(evidence, msms,
                 msms_nrt = pd.DataFrame(columns =['raw', 'sequence', 'rt', 'im', 'charge', 'irt', 'iim', 'NormalizedRetentionTime'])
                 for file in raw_files:
                     msms_irt_sub = msms_irt[msms_irt.raw == file]
-		    msms_irt_sub = msms_irt_sub.loc[:,["raw","sequence","rt", "im","charge","iim"]]
+                    msms_irt_sub = msms_irt_sub.loc[:,["raw","sequence","rt", "im","charge","iim"]]
                     # does not need to remove outliers
                     # span for the lowess interpolation is 1% of the range
                     if remove_outliers == True:
