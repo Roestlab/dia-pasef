@@ -115,43 +115,26 @@ def pasef_to_tsv(evidence, msms,
                 import statsmodels.api as smnonlinear
                 lowess = smnonlinear.nonparametric.lowess
                 # make a df to store the fitted values for merging later
-                msms_nrt = pd.DataFrame(columns =['raw', 'sequence', 'rt', 'im', 'charge', 'irt', 'iim', 'NormalizedRetentionTime'])
                 for file in raw_files:
                     msms_irt_sub = msms_irt[msms_irt.raw == file]
-                    msms_irt_sub = msms_irt_sub.loc[:,["raw","sequence","rt", "im","charge","iim"]]
+                    msms_irt_sub = msms_irt_sub.loc[:,["rt","irt"]]
                     # does not need to remove outliers
                     # span for the lowess interpolation is 1% of the range
-                    if remove_outliers == True:
-                        y = func.outliers(msms_irt_sub) # returns a df without the outliers and a list of outliers indices
-                        msms_irt_sub['NormalizedRetentionTime'] = 0
-                        msms_irt_sub.loc[y[1], 'NormalizedRetentionTime'] = np.nan
-
-                        delta = (max(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['rt']) - min(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['rt'])) * 0.01
-                        if len(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]) < 100:
-                            frac = 1.0
-                        else:
-                            frac = 0.1
-                        r = lowess(msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['irt'], msms_irt_sub[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['rt'], delta=delta, frac=frac, return_sorted=False, it=10)
-                        msms_irt_sub.loc[-msms_irt_sub['NormalizedRetentionTime'].isnull()]['NormalizedRetentionTime'] = pd.Series(r).values
-                        
+                    delta = (max(msms_irt_sub['rt'] - min(msms_irt_sub['rt'])) * 0.01 )
+                    if len(msms_irt_sub) < 100:
+                        frac = 1.0 # take the fraction of data to generate the weighted fitting
                     else:
-                        delta = (max(msms_irt_sub['rt'] - min(msms_irt_sub['rt'])) * 0.01 )
-                        if len(msms_irt_sub) < 100:
-                            frac = 1.0 # take the fraction of data to generate the weighted fitting
-                        else:
-                            frac = 0.1
-                        # lowess fits by y/x
-                        r = lowess(msms_irt_sub['irt'], msms_irt_sub['rt'], delta=delta, frac=frac, return_sorted=False, it=10)
-                        # r is an array of the fitted values in the order of the input array
-                        msms_irt_sub['NormalizedRetentionTime'] = pd.Series(r, index=msms_irt_sub.index).values
-                        msms_nrt = msms_nrt.append(msms_irt_sub, ignore_index = True)
-                        msms_nrt = msms_nrt.drop(columns = ['im','iim'])
-                        msms_nrt.columns = ['Raw file', 'Sequence', 'Retention time', 'Charge', 'iRT', 'NormalizedRetentionTime']
-                        msms_nrt['Charge'] = msms_nrt.Charge.astype(np.int64)
-                        ms = pd.merge(ms, msms_nrt, on = ['Raw file', 'Sequence', 'Retention time', 'Charge'])          
-
+                        frac = 0.1
+                    # lowess fits by y/x
+                    r = lowess(msms_irt_sub['irt'], msms_irt_sub['rt'], delta=delta, frac=frac)
+                    lowess_x = list(zip(*r))[0]
+                    lowess_y = list(zip(*r))[1]
+                    # create an interpolation function
+                    f = interp1d(lowess_x, lowess_y, bounds_error=False)
+                    nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time'])
+                    ms.loc[ms['Raw file'] == file, 'irt'] = nRT                       
             else:
-                print("Only rt_alignment='linear' is currently implemented")
+                print("Only rt_alignment:linear and lowess calibrations are currently implemented")
                 ms['irt'] = ms['Calibrated retention time']
         else:
             ms['irt'] = ms['Calibrated retention time']
