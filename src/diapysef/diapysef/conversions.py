@@ -49,7 +49,6 @@ def pasef_to_tsv(evidence, msms,
                  pdfout = "rtcalibration.pdf",
                  im_column = 'Ion mobility index',
                  rt_alignment = 'nonlinear',
-		 remove_outliers = None,
                  im_alignment = 'linear'):
     """Converts a mq output to a library taking a best replicate approach."""
 
