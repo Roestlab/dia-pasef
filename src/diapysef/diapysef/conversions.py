@@ -133,8 +133,10 @@ def pasef_to_tsv(evidence, msms,
                     lowess_y = list(zip(*r))[1]
                     # create an interpolation function
                     f = interp1d(lowess_x, lowess_y, bounds_error=False)
-                    nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time'])
-                    ms[ms['Raw file'] == file]['irt'] = nRT                       
+                    nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time']) #interpolate real data with training set
+                    nrt = []
+                    for t in nRT: nrt.append()
+                    ms[ms['Raw file'] == file,'irt'] = list(map(str, nrt))
             else:
                 print("Only rt_alignment:linear and lowess calibrations are currently implemented")
                 ms['irt'] = ms['Calibrated retention time']
