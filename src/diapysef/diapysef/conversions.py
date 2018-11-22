@@ -6,6 +6,7 @@ import statsmodels.formula.api as sm
 import numpy as np
 from statsmodels.graphics.regressionplots import abline_plot
 from matplotlib.backends.backend_pdf import PdfPages
+from scipy.interpolate import interp1d
 
 def calibrate(data, plot = True, pdf = "rtcalibration"):
     """Fits a linear model to the irts"""
@@ -25,6 +26,21 @@ def calibrate(data, plot = True, pdf = "rtcalibration"):
     # row = np.array([['raw', 'intercept', 'slope'], [data.iloc[0,0], res.params.Intercept, res.params.rt]])
     # return pd.DataFrame(data = row[1:,], columns = row[0,0:])
 
+def outliers(data, tolerance = 7):
+    '''
+    (dataframe, int) -> list of dataframe & list of outliers indices
+
+    Identify outlier indices for lowess alignment.
+    Returns a pandas dataframe wwith outliers removed
+    '''
+    filename = data.iloc[0,0]
+    mod = sm.ols(formula = 'irt ~rt', data = data)
+    res = mod.fit()
+    absd = abs(res.resid) # get the absolute s.d. for each point from linear regression
+    outliers = data[absd > 7].index #get the index of the outliers
+    data1 = data.drop(outliers)
+    return [data1,outliers]
+
 def get_product_charge(msl, msms):
     return(msl)
 
@@ -32,7 +48,7 @@ def pasef_to_tsv(evidence, msms,
                  irt_file = None,
                  pdfout = "rtcalibration.pdf",
                  im_column = 'Ion mobility index',
-                 rt_alignment = 'linear',
+                 rt_alignment = 'nonlinear',
                  im_alignment = 'linear'):
     """Converts a mq output to a library taking a best replicate approach."""
 
@@ -80,7 +96,7 @@ def pasef_to_tsv(evidence, msms,
         raw_files = msms_irt.raw.unique()
         if rt_alignment is not None:
             if rt_alignment is 'linear':
-                print("Aligning retention time...")
+                print("Aligning retention time by linear regression ...")
                 # Generate the iRT calibrators
                 calibrators = []
                 pp = PdfPages(pdfout)
@@ -94,8 +110,34 @@ def pasef_to_tsv(evidence, msms,
                 ms = pd.merge(ms, calibrators, on = 'Raw file')
                 ms['irt'] = ms.intercept + ms.slope * ms['Calibrated retention time']
                 ms = ms.drop(columns=['intercept', 'slope'])
+
+            elif rt_alignment is 'nonlinear':
+                print("Aligning retention time by lowess regression ...")
+                import statsmodels.api as smnonlinear
+                lowess = smnonlinear.nonparametric.lowess
+                # make a df to store the fitted values for merging later
+                for file in raw_files:
+                    msms_irt_sub = msms_irt[msms_irt.raw == file]
+                    msms_irt_sub = msms_irt_sub.loc[:,["rt","irt"]]
+                    # does not need to remove outliers
+                    # span for the lowess interpolation is 1% of the range
+                    delta = (max(msms_irt_sub['rt'] - min(msms_irt_sub['rt'])) * 0.01 )
+                    if len(msms_irt_sub) < 100:
+                        frac = 1.0 # take the fraction of data to generate the weighted fitting
+                    else:
+                        frac = 0.1
+                    # lowess fits by y/x
+                    r = lowess(msms_irt_sub['irt'], msms_irt_sub['rt'], delta=delta, frac=frac)
+                    lowess_x = list(zip(*r))[0]
+                    lowess_y = list(zip(*r))[1]
+                    # create an interpolation function
+                    f = interp1d(lowess_x, lowess_y, bounds_error=False)
+                    nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time']) #interpolate real data with training set
+                    nrt = []
+                    for t in nRT: nrt.append()
+                    ms[ms['Raw file'] == file,'irt'] = list(map(str, nrt))
             else:
-                print("Only rt_alignment='linear' is currently implemented")
+                print("Only rt_alignment:linear and lowess calibrations are currently implemented")
                 ms['irt'] = ms['Calibrated retention time']
         else:
             ms['irt'] = ms['Calibrated retention time']
