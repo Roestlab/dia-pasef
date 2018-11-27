@@ -96,7 +96,7 @@ def pasef_to_tsv(evidence, msms,
         raw_files = msms_irt.raw.unique()
         if rt_alignment is not None:
             if rt_alignment is 'linear':
-                print("Aligning retention time by linear regression ...")
+                print("Aligning retention time...")
                 # Generate the iRT calibrators
                 calibrators = []
                 pp = PdfPages(pdfout)
@@ -112,7 +112,6 @@ def pasef_to_tsv(evidence, msms,
                 ms = ms.drop(columns=['intercept', 'slope'])
 
             elif rt_alignment is 'nonlinear':
-                print("Aligning retention time by lowess regression ...")
                 import statsmodels.api as smnonlinear
                 lowess = smnonlinear.nonparametric.lowess
                 # make a df to store the fitted values for merging later
@@ -132,10 +131,11 @@ def pasef_to_tsv(evidence, msms,
                     lowess_y = list(zip(*r))[1]
                     # create an interpolation function
                     f = interp1d(lowess_x, lowess_y, bounds_error=False)
-                    nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time']) #interpolate real data with training set
+                    nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time'])
+
                     nrt = []
-                    for t in nRT: nrt.append()
-                    ms[ms['Raw file'] == file,'irt'] = list(map(str, nrt))
+                    for t in nRT: nrt.append(t)
+                    ms.loc[ms['Raw file'] == file, 'irt'] = list(map(str, nrt))
             else:
                 print("Only rt_alignment:linear and lowess calibrations are currently implemented")
                 ms['irt'] = ms['Calibrated retention time']
@@ -182,7 +182,7 @@ def pasef_to_tsv(evidence, msms,
     df1 = pd.concat([masses, intensities], axis = 1, keys = ['Masses', 'Intensities'])
     msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
     msl2 = msl2.join(df1).reset_index(drop = True)
-    msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","Tr_recalibrated", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
+    msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","iRT", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
     msl2 = get_product_charge(msl2, msms)
 
     # Reorder the columns as they are in libraries generated with the OSW assay generator
