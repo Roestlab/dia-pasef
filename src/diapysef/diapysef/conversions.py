@@ -96,7 +96,7 @@ def pasef_to_tsv(evidence, msms,
         raw_files = msms_irt.raw.unique()
         if rt_alignment is not None:
             if rt_alignment is 'linear':
-                print("Aligning retention time...")
+                print("Aligning retention time linearly...")
                 # Generate the iRT calibrators
                 calibrators = []
                 pp = PdfPages(pdfout)
@@ -112,6 +112,7 @@ def pasef_to_tsv(evidence, msms,
                 ms = ms.drop(columns=['intercept', 'slope'])
 
             elif rt_alignment is 'nonlinear':
+                print("Aligning retention time by lowess...")
                 import statsmodels.api as smnonlinear
                 lowess = smnonlinear.nonparametric.lowess
                 # make a df to store the fitted values for merging later
