@@ -161,7 +161,7 @@ We provide the following plotting function, as a commandline script
 
 .. code:: bash
 
-    plot_dia_windows.py all_peptides_1K0.csv window_layout.csv
+    plot_dia_windows.py window_layout.csv all_peptides_1K0.csv
 
 Or in python:
 
