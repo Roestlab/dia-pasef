@@ -267,6 +267,10 @@ def main():
         consumer = diapysef.merge_consumer.MergeConsumer(consumer, merge_scans)
 
     if overlap_scans > 1:
+        
+        # For overlapping scans, we need to create N different consumers (N files on disk) 
+        # with different file names which will then contain the overlapped spectra 
+        
         consumers = []
         for k in range(overlap_scans):
             outspl = output_fname.rsplit(".", 1)
