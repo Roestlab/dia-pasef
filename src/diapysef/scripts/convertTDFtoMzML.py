@@ -15,6 +15,7 @@ from ctypes import cdll
 
 import diapysef.timsdata
 import diapysef.merge_consumer
+import diapysef.splitting_consumer
 
 try:
     if sys.platform[:5] == "win32" or sys.platform[:5] == "win64":
@@ -175,6 +176,28 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width)
     return sframe
 
 
+def get_consumer(output_fname):
+    # Store output
+    if output_fname.lower().endswith("mzml"):
+        consumer = pyopenms.PlainMSDataWritingConsumer(output_fname)
+
+        # Compress output
+        try:
+            opt = consumer.getOptions()
+            diapysef.util.setPeakFileOptions(opt)
+            consumer.setOptions(opt)
+        except Exception:
+            print("Your version of pyOpenMS does not support any compression, your files may get rather large")
+            pass
+
+    elif output_fname.lower().endswith("sqmass"):
+        consumer = pyopenms.MSDataSqlConsumer(output_fname)
+
+    else:
+        raise Exception("Supported filenames: mzML and sqMass.")
+
+    return consumer
+
 def main():
 
     parser = argparse.ArgumentParser(description ="Conversion program to convert a Bruker TIMS file to a single mzML")
@@ -191,6 +214,11 @@ def main():
                         type = int,
                         default = -1,
                         dest = "merge_scans")
+    parser.add_argument("--overlap",
+                        help = "How many overlapping windows were recorded for the same m/z window",
+                        type = int,
+                        default = -1,
+                        dest = "overlap_scans")
     parser.add_argument("-r", "--framerange",
                         help = "The minimum and maximum Frames to convert.",
                         type = int,
@@ -205,6 +233,8 @@ def main():
     print("Output name: ", output_fname)
     merge_scans = args.merge_scans
     print("Scans to merge: ", merge_scans)
+    overlap_scans = args.overlap_scans
+    print("Overlapping scans: ", overlap_scans)
     frame_limit = args.frame_limit
     print("Frame limits: ", frame_limit)
 
@@ -231,24 +261,27 @@ def main():
     N = row[0]
     print("Analysis has {0} frames.".format(N))
 
-    # Store output
-    if output_fname.lower().endswith("mzml"):
-        consumer = pyopenms.PlainMSDataWritingConsumer(output_fname)
-
-        # Compress output
-        try:
-            opt = consumer.getOptions()
-            diapysef.util.setPeakFileOptions(opt)
-            consumer.setOptions(opt)
-        except Exception:
-            print("Your version of pyOpenMS does not support any compression, your files may get rather large")
-            pass
-
-    if output_fname.lower().endswith("sqmass"):
-        consumer = pyopenms.MSDataSqlConsumer(output_fname)
+    consumer = get_consumer(output_fname)
 
     if merge_scans != -1:
         consumer = diapysef.merge_consumer.MergeConsumer(consumer, merge_scans)
+
+    if overlap_scans > 1:
+        consumers = []
+        for k in range(overlap_scans):
+            outspl = output_fname.rsplit(".", 1)
+            outname = outspl[0] + "_" + str(k) + "." + outspl[1]
+            consumer = get_consumer(outname)
+            consumers.append(consumer)
+
+        if merge_scans != -1:
+            m_consumers = []
+            for c in consumers:
+                consumer = diapysef.merge_consumer.MergeConsumer(c, merge_scans)
+                m_consumers.append(consumer)
+            consumers = m_consumers # use the merge consumers in the overlap consumer
+
+        consumer = diapysef.splitting_consumer.SplittingConsumer(consumers)
 
     if frame_limit[0] > -1 and frame_limit[0] <= N:
         lower_frame = frame_limit[0]
@@ -267,6 +300,7 @@ def main():
         store_frame(frame_id+1, td, conn, consumer, compressFrame=True, verbose=False)
     
     print("Conversion completed, press Enter to continue.")
+
 if __name__ == "__main__":
     main()
 
