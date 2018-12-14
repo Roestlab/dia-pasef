@@ -5,11 +5,11 @@ def readme():
         return f.read()
 
 setup(name='diapysef',
-      version='0.2',
+      version='0.3',
       description='Analysis and visualization of DIA PASEF data',
       long_description=readme(),
-      author='Max Frank, Hannes Roest',
-      author_email='max.frank@mail.utoronto.ca',
+      author='Max Frank, Annie Ha, Hannes Roest',
+      author_email='hannes.rost@utoronto.ca',
       license='MIT',
       packages=['diapysef'],
       install_requires=[
