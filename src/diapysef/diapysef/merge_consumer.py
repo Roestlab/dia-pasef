@@ -82,3 +82,4 @@ class MergeConsumer():
         merge_spec.setFloatDataArrays([fda])
         merge_spec.sortByPosition()
         return merge_spec
+
