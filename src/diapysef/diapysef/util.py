@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 from __future__ import print_function
+import pyopenms
 
-def setCompressionOptions(opt)
+def setCompressionOptions(opt):
     """
     Adds suitable compression options for an object of type
     pyopenms.PeakFileOptions
