@@ -16,6 +16,8 @@ from ctypes import cdll
 import diapysef.timsdata
 import diapysef.merge_consumer
 import diapysef.splitting_consumer
+import diapysef.util
+
 
 try:
     if sys.platform[:5] == "win32" or sys.platform[:5] == "win64":
@@ -184,9 +186,10 @@ def get_consumer(output_fname):
         # Compress output
         try:
             opt = consumer.getOptions()
-            diapysef.util.setPeakFileOptions(opt)
+            diapysef.util.setCompressionOptions(opt)
             consumer.setOptions(opt)
-        except Exception:
+        except Exception as e:
+            print(e)
             print("Your version of pyOpenMS does not support any compression, your files may get rather large")
             pass
 
