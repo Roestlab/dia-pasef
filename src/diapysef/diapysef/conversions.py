@@ -133,8 +133,20 @@ def pasef_to_tsv(evidence, msms,
                     # create an interpolation function
                     f = interp1d(lowess_x, lowess_y, bounds_error=False)
                     nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time'])
+  
+                    # fit linear extrapolation for values outside of approximation
+                    # print(sum(np.isnan(nRT)))
+                    min_bound = min(lowess_x)
+                    max_bound = max(lowess_x)
+                    idx = np.asarray(ms.index[(ms['Raw file'] == file) & (ms['Calibrated retention time'] < min_bound) | (ms['Calibrated retention time'] > max_bound)])
+                    # print(len(idx))
+                    lnmod = calibrate(msms_irt_sub)
+                    intercept = lnmod[1] # intercept
+                    slope = lnmod[2] # slope
 
+                    nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'][idx].values) + intercept
                     nrt = []
+
                     for t in nRT: nrt.append(t)
                     ms.loc[ms['Raw file'] == file, 'irt'] = list(map(str, nrt))
             else:
