@@ -142,11 +142,7 @@ def pasef_to_tsv(evidence, msms,
                     idx = np.asarray(np.where((ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values > max_bound)))
 
                     # cannot use pandas.index on ms, it returns the index of the original ms data frame and not th subsetted dataframe
-                    #idx = np.asarray(ms.index[(ms['Raw file'] == file) & ((ms['Calibrated retention time'] < min_bound) | (ms['Calibrated retention time'] > max_bound))])
 
-                    #print(len(idx))
-                    #print(len(nRT))
-                    #print(sum(np.isnan(nRT)))
                     lnmod = calibrate(msms_irt_sub)
                     intercept = lnmod[1] # intercept
                     slope = lnmod[2] # slope
