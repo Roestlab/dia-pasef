@@ -144,9 +144,9 @@ def pasef_to_tsv(evidence, msms,
                     # cannot use pandas.index on ms, it returns the index of the original ms data frame and not th subsetted dataframe
                     #idx = np.asarray(ms.index[(ms['Raw file'] == file) & ((ms['Calibrated retention time'] < min_bound) | (ms['Calibrated retention time'] > max_bound))])
 
-                    print(len(idx))
-                    print(len(nRT))
-                    print(sum(np.isnan(nRT)))
+                    #print(len(idx))
+                    #print(len(nRT))
+                    #print(sum(np.isnan(nRT)))
                     lnmod = calibrate(msms_irt_sub)
                     intercept = lnmod[1] # intercept
                     slope = lnmod[2] # slope
@@ -201,7 +201,7 @@ def pasef_to_tsv(evidence, msms,
     df1 = pd.concat([masses, intensities], axis = 1, keys = ['Masses', 'Intensities'])
     msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
     msl2 = msl2.join(df1).reset_index(drop = True)
-    msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","Tr_recalibrated", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
+    msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","iRT", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
     msl2 = get_product_charge(msl2, msms)
 
     # Reorder the columns as they are in libraries generated with the OSW assay generator
