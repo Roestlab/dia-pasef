@@ -94,6 +94,7 @@ def pasef_to_tsv(evidence, msms,
         msms_irt.columns = ["raw","sequence","rt","im", "charge"]
         msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
         raw_files = msms_irt.raw.unique()
+       
         if rt_alignment is not None:
             if rt_alignment is 'linear':
                 print("Aligning retention time linearly...")
@@ -133,24 +134,25 @@ def pasef_to_tsv(evidence, msms,
                     # create an interpolation function
                     f = interp1d(lowess_x, lowess_y, bounds_error=False)
                     nRT = np.asarray(f(ms.loc[ms['Raw file'] == file ,'Calibrated retention time'].values))
-  
+
                     # fit linear extrapolation for values outside of approximation
                     # print(sum(np.isnan(nRT)))
                     min_bound = min(lowess_x)
                     max_bound = max(lowess_x)
-
                     idx = np.asarray(np.where((ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values > max_bound)))
-                    #idx = np.where((ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values > max_bound))
 
-                    # print(len(idx))
+                    # cannot use pandas.index on ms, it returns the index of the original ms data frame and not th subsetted dataframe
+                    #idx = np.asarray(ms.index[(ms['Raw file'] == file) & ((ms['Calibrated retention time'] < min_bound) | (ms['Calibrated retention time'] > max_bound))])
+
+                    print(len(idx))
+                    print(len(nRT))
+                    print(sum(np.isnan(nRT)))
                     lnmod = calibrate(msms_irt_sub)
                     intercept = lnmod[1] # intercept
                     slope = lnmod[2] # slope
-
                     nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values[idx]) + intercept
-                    #nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'][idx].values) + intercept
+     
                     nrt = []
-
                     for t in nRT: nrt.append(t)
                     ms.loc[ms['Raw file'] == file, 'irt'] = list(map(str, nrt))
             else:
@@ -199,7 +201,7 @@ def pasef_to_tsv(evidence, msms,
     df1 = pd.concat([masses, intensities], axis = 1, keys = ['Masses', 'Intensities'])
     msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
     msl2 = msl2.join(df1).reset_index(drop = True)
-    msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","iRT", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
+    msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","Tr_recalibrated", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
     msl2 = get_product_charge(msl2, msms)
 
     # Reorder the columns as they are in libraries generated with the OSW assay generator
