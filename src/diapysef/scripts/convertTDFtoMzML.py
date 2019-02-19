@@ -1,313 +1,221 @@
-#!/usr/bin/env python
-from __future__ import print_function
-
-"""Conversion program to convert a Bruker TIMS file to a single mzML
-
-"""
-import argparse
 import sys
-import sqlite3
-import time
-import pyopenms
+import matplotlib
+matplotlib.use('Agg')
+import pandas as pd
+import statsmodels.formula.api as sm
 import numpy as np
-#import matplotlib.pyplot as plt
-from ctypes import cdll
+from statsmodels.graphics.regressionplots import abline_plot
+from matplotlib.backends.backend_pdf import PdfPages
+from scipy.interpolate import interp1d
 
-import diapysef.timsdata
-import diapysef.merge_consumer
-import diapysef.splitting_consumer
-import diapysef.util
+def calibrate(data, plot = True, pdf = "rtcalibration"):
+    """Fits a linear model to the irts"""
+    filename = data.iloc[0,0]
+    mod = sm.ols(formula = 'irt ~ rt', data = data)
+    res = mod.fit()
+    # scatter-plot data
+    ax = data.plot(x='rt', y='irt', kind='scatter')
+    a = abline_plot(model_results=res, ax=ax)
+    a = abline_plot(intercept=0, slope=1, ax=ax)
+    # print(res.rsquared)
+    a.suptitle("%s \n R2: %s \n R2adj: %s" % (filename, res.rsquared, res.rsquared_adj), fontsize = 10)
+    # text(0.9, 0.1,("R2:"), ha='center', va='center', transform=ax.transAxes)
+    a.savefig(pdf, format = 'pdf')
+    matplotlib.pyplot.close()
+    return [filename, res.params.Intercept, res.params.rt]
+    # row = np.array([['raw', 'intercept', 'slope'], [data.iloc[0,0], res.params.Intercept, res.params.rt]])
+    # return pd.DataFrame(data = row[1:,], columns = row[0,0:])
 
+def outliers(data, tolerance = 7):
+    '''
+    (dataframe, int) -> list of dataframe & list of outliers indices
 
-try:
-    if sys.platform[:5] == "win32" or sys.platform[:5] == "win64":
-        libname = "timsdata.dll"
-        dll = cdll.LoadLibrary(libname)
-    elif sys.platform[:5] == "linux":
-        libname = "libtimsdata.so"
-        dll = cdll.LoadLibrary(libname)
+    Identify outlier indices for lowess alignment.
+    Returns a pandas dataframe wwith outliers removed
+    '''
+    filename = data.iloc[0,0]
+    mod = sm.ols(formula = 'irt ~rt', data = data)
+    res = mod.fit()
+    absd = abs(res.resid) # get the absolute s.d. for each point from linear regression
+    outliers = data[absd > 7].index #get the index of the outliers
+    data1 = data.drop(outliers)
+    return [data1,outliers]
+
+def get_product_charge(msl, msms):
+    return(msl)
+
+def pasef_to_tsv(evidence, msms,
+                 irt_file = None,
+                 pdfout = "rtcalibration.pdf",
+                 im_column = 'Ion mobility index',
+                 rt_alignment = 'nonlinear',
+                 im_alignment = 'linear'):
+    """Converts a mq output to a library taking a best replicate approach."""
+
+    ev = evidence.loc[:, ["id", "Calibrated retention time", "Ion mobility index", im_column]]
+    ev = ev.rename(columns = {'id':'Evidence ID'})
+    ev = ev.rename(columns = {im_column:'imcol'})
+    ms = pd.merge(msms, ev, on = 'Evidence ID')
+    ms = ms.dropna(subset=["Calibrated retention time"]) # Some precursors in MQ are not annotated with a RT
+
+    # Replace modifications in the MQ output so that they are OpenMS readable
+    ms['Modified sequence'] = ms['Modified sequence'].str.replace('_', '')
+    ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ox)","Oxidation")
+    ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ph)","Phospho")
+    ms['Modified sequence'] = ms['Modified sequence'].str.replace("C","C(Carbamidomethyl)")
+    ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ac)","Acetylation")
+    ms = ms.rename(columns = {'Modified sequence':'ModifiedPeptideSequence'})
+
+    if irt_file is not None:
+        if isinstance(irt_file, str):
+            irt = pd.read_table(irt_file)
+        elif isinstance(irt_file, pd.DataFrame):
+            irt = irt_file
+        else:
+            print("irt_file must be a path to an irt table or a pd.DataFrame object.")
+            sys.exit()
+
+            # Prepare iRT table
+        if irt.shape[1] > 2:
+            irt = irt.loc[:, ["ModifiedPeptideSequence", "NormalizedRetentionTime", "PrecursorIonMobility","PrecursorCharge"]]
+            irt = irt.drop_duplicates()
+
+        irt.columns = ["sequence","irt", "iim", "charge"]
+        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:4\\)","C(Carbamidomethyl)")
+        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:1\\)","Acetylation")
+        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:35\\)","Oxidation")
+        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:21\\)","Phospho")
+
+        # Use the irt peptides present in the MQ output to calibrate
+        msms_irt = ms[ms["ModifiedPeptideSequence"].isin(irt["sequence"])]
+        ## We chose the best id of each peptide (only one charge state for alignment)
+        msms_irt = msms_irt.loc[msms_irt.groupby(["Raw file","ModifiedPeptideSequence"])['PEP'].idxmin()]
+        msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Calibrated retention time", "imcol", "Charge"]]
+        msms_irt.columns = ["raw","sequence","rt","im", "charge"]
+        msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
+        raw_files = msms_irt.raw.unique()
+       
+        if rt_alignment is not None:
+            if rt_alignment is 'linear':
+                print("Aligning retention time linearly...")
+                # Generate the iRT calibrators
+                calibrators = []
+                pp = PdfPages(pdfout)
+                for file in raw_files:
+                    cal = calibrate(msms_irt[msms_irt.raw == file], pdf = pp)
+                    calibrators.append(cal)
+                pp.close()
+
+                # Apply rt calibrators
+                calibrators = pd.DataFrame(columns = ['Raw file', 'intercept', 'slope'], data = calibrators)
+                ms = pd.merge(ms, calibrators, on = 'Raw file')
+                ms['irt'] = ms.intercept + ms.slope * ms['Calibrated retention time']
+                ms = ms.drop(columns=['intercept', 'slope'])
+
+            elif rt_alignment is 'nonlinear':
+                print("Aligning retention time by lowess...")
+                import statsmodels.api as smnonlinear
+                lowess = smnonlinear.nonparametric.lowess
+                # make a df to store the fitted values for merging later
+                for file in raw_files:
+                    msms_irt_sub = msms_irt[msms_irt.raw == file]
+                    msms_irt_sub = msms_irt_sub.loc[:,["rt","irt"]]
+                    # does not need to remove outliers
+                    # span for the lowess interpolation is 1% of the range
+                    delta = (max(msms_irt_sub['rt'] - min(msms_irt_sub['rt'])) * 0.01 )
+                    if len(msms_irt_sub) < 100:
+                        frac = 1.0 # take the fraction of data to generate the weighted fitting
+                    else:
+                        frac = 0.1
+                    # lowess fits by y/x
+                    r = lowess(msms_irt_sub['irt'], msms_irt_sub['rt'], delta=delta, frac=frac)
+                    lowess_x = list(zip(*r))[0]
+                    lowess_y = list(zip(*r))[1]
+                    # create an interpolation function
+                    f = interp1d(lowess_x, lowess_y, bounds_error=False)
+                    nRT = np.asarray(f(ms.loc[ms['Raw file'] == file ,'Calibrated retention time'].values))
+
+                    # fit linear extrapolation for values outside of approximation
+                    # print(sum(np.isnan(nRT)))
+                    min_bound = min(lowess_x)
+                    max_bound = max(lowess_x)
+                    idx = np.asarray(np.where((ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values > max_bound)))
+
+                    # cannot use pandas.index on ms, it returns the index of the original ms data frame and not th subsetted dataframe
+                    #idx = np.asarray(ms.index[(ms['Raw file'] == file) & ((ms['Calibrated retention time'] < min_bound) | (ms['Calibrated retention time'] > max_bound))])
+
+                    print(len(idx))
+                    print(len(nRT))
+                    print(sum(np.isnan(nRT)))
+                    lnmod = calibrate(msms_irt_sub)
+                    intercept = lnmod[1] # intercept
+                    slope = lnmod[2] # slope
+                    nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values[idx]) + intercept
+     
+                    nrt = []
+                    for t in nRT: nrt.append(t)
+                    ms.loc[ms['Raw file'] == file, 'irt'] = list(map(str, nrt))
+            else:
+                print("Only rt_alignment:linear and lowess calibrations are currently implemented")
+                ms['irt'] = ms['Calibrated retention time']
+        else:
+            ms['irt'] = ms['Calibrated retention time']
+
+        if im_alignment is not None:
+            if im_alignment is "linear":
+                print("Aligning ion mobility")
+                # Generate the iIM calibrators
+                calibrators = []
+                pp = PdfPages("imcalibration.pdf")
+                for file in raw_files:
+                    msms_irt_sub = msms_irt[msms_irt.raw == file]
+                    msms_irt_sub = msms_irt_sub.loc[:,["raw","sequence","im","iim"]]
+                    msms_irt_sub.columns = ["raw","sequence","rt","irt"]
+                    cal = calibrate(msms_irt_sub, pdf = pp)
+                    calibrators.append(cal)
+                pp.close()
+                # Apply im calibrators
+                calibrators = pd.DataFrame(columns = ['Raw file', 'intercept', 'slope'], data = calibrators)
+                ms = pd.merge(ms, calibrators, on = 'Raw file')
+                ms['iim'] = ms.intercept + ms.slope * ms['imcol']
+                ms = ms.drop(columns=['intercept', 'slope'])
+            else:
+                print("Only im_alignment='linear' is currently implemented")
+                ms['iim'] = ms['imcol']
+
+        else:
+            ms['iim'] = ms['imcol']
     else:
-        raise Exception("Unsupported platform.")
-except OSError as e:
-    print("This functionality can only be carried out if the bruker sdk is present. Please install it first. The sdk can be installed by installing proteowizard(version >=3, http://proteowizard.sourceforge.net), or by placing the a library file in your path (For windows this will be timsdata.dll and for Linux libtimsdata.so).\n")
-    sys.exit()
+        ms['irt'] = ms['Calibrated retention time']
+        ms['iim'] = ms['imcol']
 
-def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
-    """
-    Store a single frame as an individual mzML file
+    # Filter for best identification (lowest PEP)
+    ms = ms.loc[ms.groupby(["ModifiedPeptideSequence", "Charge"])['PEP'].idxmin()]
+    # Filter decoy peptides
+    ms = ms[ms['Reverse'].isna()]
 
-    Note that there are two ways to store the data:
-      (i) Multiple spectra per frame (for visualization), compressFrame is False. This is the
-      easiest way to visualize and process the data but involves a few hacks,
-      namely storing the IM axis as the RT of each spectrum.
+    # Shape data for AssayGenerator
+    msl = ms.loc[:, ["id","m/z","Masses","Charge","irt", "iim", "imcol", "Intensities","Sequence","ModifiedPeptideSequence","Proteins"]]
+    masses = msl['Masses'].str.split(';', expand = True).stack().str.strip().reset_index(level = 1, drop=True)
+    intensities = msl['Intensities'].str.split(';', expand = True).stack().str.strip().reset_index(level = 1, drop=True)
+    df1 = pd.concat([masses, intensities], axis = 1, keys = ['Masses', 'Intensities'])
+    msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
+    msl2 = msl2.join(df1).reset_index(drop = True)
+    msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","Tr_recalibrated", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
+    msl2 = get_product_charge(msl2, msms)
 
-      (ii) One spectrum per frame, compressFrame is True. This puts all peaks
-      into a single spectrum (while storing the IM data in an extra array).
-      This is more efficient for storage and allows analysis that is ignorant
-      of the IM dimension.
+    # Reorder the columns as they are in libraries generated with the OSW assay generator
+    # msl2 = msl2[["transition_group_id","PrecursorMz","ProductMz","PrecursorCharge","Tr_recalibrated","LibraryIntensity","PeptideSequence","FullUniModPeptideName","ProteinName", "PrecursorIonMobility"]]
+    msl2['decoy'] = 0
+    msl2['transition_name'] = ['_'.join(str(i) for i in z) for z in zip(msl2.transition_group_id,msl2.PrecursorMz,msl2.ProductMz)]
 
-      Note that msms = 2 means that we have an MS2 scan whereas msms = 8 stands
-      for pasef scan.
-    """
-    # Get a projected mass spectrum:
-    q = conn.execute("SELECT NumScans, Time, Polarity, MsMsType FROM Frames WHERE Id={0}".format(frame_id))
-    tmp = q.fetchone()
-    num_scans = tmp[0]
-    time = tmp[1]
-    pol = tmp[2]
-    msms = int(tmp[3])
+    msl2=msl2.drop_duplicates()
+    # Write output
+    # msl2.to_csv("pasefLib.tsv", sep = "\t", index=False)
 
-    center = -1
-    width = -1
-    next_scan_switch = -1
-    mslevel = 1
-    scan_data = []
-    scan_data_it = 0
+    return(msl2)
 
-    # Check whether we have a MS2 or a PASEF scan
-    if msms == 2:
-        q = conn.execute("SELECT TriggerMass, IsolationWidth, PrecursorCharge, CollisionEnergy FROM FrameMsMsInfo WHERE Frame={0}".format(frame_id))
-        tmp = q.fetchone()
-        center = float(tmp[0])
-        width = float(tmp[1])
-        mslevel = 2
-    elif msms == 8:
-        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy FROM PasefFrameMsMsInfo WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
-        scandata = q.fetchall()
-        tmp = scandata[scan_data_it]
-        center = float(tmp[0])
-        width = float(tmp[1])
-        scan_start = int(tmp[2])
-        scan_end = int(tmp[3])
-        next_scan_switch = scan_start
-        mslevel = 2
-
-    if verbose:
-        print("mslevel", mslevel, msms)
-
-    # Get the mapping of the ion mobility axis
-    scan_number_axis = np.arange(num_scans, dtype=np.float64)
-    ook0_axis = td.scanNumToOneOverK0(frame_id, scan_number_axis)
-
-    allmz = []
-    allint = []
-    allim = []
-
-    # Traverse in reversed order to get low ion mobilities first
-    for k, scan in reversed(list(enumerate(td.readScans(frame_id, 0, num_scans)))):
-        index = np.array(scan[0], dtype=np.float64)
-        mz = td.indexToMz(frame_id, index)
-        intens = scan[1]
-        drift_time = ook0_axis [ k ] 
-        if compressFrame:
-            allmz.append(mz)
-            allint.append(intens)
-            allim.append( [drift_time for dr_time in mz] )
-
-            # We have multiple MS2 spectra in each frame, we need to separate
-            # them based on the information from PasefFrameMsMsInfo which
-            # indicates the switch scan and the isolation parameter for each
-            # quadrupole isolation.
-            if next_scan_switch != -1 and next_scan_switch == k:
-
-                if verbose:
-                    print("Switch to new scan at", k, "with mapping", scandata)
-
-                sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
-                sframe.setNativeID("frame=%s_scan=%s" % (frame_id, next_scan_switch) )
-                exp.consumeSpectrum(sframe)
-                allmz = []
-                allint = []
-                allim = []
-                if k == 0: continue
-
-                scan_data_it += 1
-                tmp = scandata[scan_data_it]
-                center = float(tmp[0])
-                width = float(tmp[1])
-                scan_start = int(tmp[2])
-                scan_end = int(tmp[3])
-                next_scan_switch = scan_start
-            continue
-
-        # Store data in OpenMS Spectrum file -> each TOF push is an individual
-        # spectrum and we store the ion mobility in the precursor. The frame
-        # can be reconstructed by grouping all spectra with the same RT.
-        s = pyopenms.MSSpectrum()
-        s.setMSLevel(mslevel)
-        s.set_peaks( (mz, intens) ) 
-        s.setRT(time)
-        s.setNativeID("frame=%s spec %s" % (frame_id, k) )
-        p = pyopenms.Precursor()
-        p.setDriftTime(drift_time)
-        if mslevel == 2:
-            p.setMZ(center)
-            p.setIsolationWindowUpperOffset(width / 2.0)
-            p.setIsolationWindowLowerOffset(width / 2.0)
-        s.setPrecursors([p])
-        exp.consumeSpectrum(s)
-
-    if compressFrame and next_scan_switch == -1:
-        sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
-        sframe.setNativeID("frame=%s" % frame_id)
-        exp.consumeSpectrum(sframe)
-
-def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width):
-    mz = np.concatenate(allmz)
-    intens = np.concatenate(allint)
-    ims = np.concatenate(allim)
-
-    fda = pyopenms.FloatDataArray()
-    fda.setName("Ion Mobility")
-    fda.resize(len(mz))
-    for k, val in enumerate(ims):
-        fda[k] = val
-
-    sframe = pyopenms.MSSpectrum()
-    sframe.setMSLevel(mslevel)
-    sframe.setRT(rtime)
-    sframe.setFloatDataArrays([fda])
-    p = pyopenms.Precursor()
-    if mslevel == 2:
-        p.setMZ(center)
-        p.setIsolationWindowUpperOffset(width / 2.0)
-        p.setIsolationWindowLowerOffset(width / 2.0)
-    sframe.setPrecursors([p])
-    sframe.set_peaks( (mz, intens) )
-    sframe.sortByPosition()
-    return sframe
-
-
-def get_consumer(output_fname):
-    # Store output
-    if output_fname.lower().endswith("mzml"):
-        consumer = pyopenms.PlainMSDataWritingConsumer(output_fname)
-
-        # Compress output
-        try:
-            opt = consumer.getOptions()
-            diapysef.util.setCompressionOptions(opt)
-            consumer.setOptions(opt)
-        except Exception as e:
-            print(e)
-            print("Your version of pyOpenMS does not support any compression, your files may get rather large")
-            pass
-
-    elif output_fname.lower().endswith("sqmass"):
-        consumer = pyopenms.MSDataSqlConsumer(output_fname)
-
-    else:
-        raise Exception("Supported filenames: mzML and sqMass.")
-
-    return consumer
-
-def main():
-
-    parser = argparse.ArgumentParser(description ="Conversion program to convert a Bruker TIMS file to a single mzML")
-    parser.add_argument("-a", "--analysis_dir",
-                        help = "The location of the directory containing raw data (usually .d)",
-                        dest = 'analysis_dir',
-                        required = True)
-    parser.add_argument("-o", "--output_name",
-                        help = "The name of the output file",
-                        dest = "output_fname",
-                        required = True)
-    parser.add_argument("-m", "--merge",
-                        help = "How many frames to sum up into one",
-                        type = int,
-                        default = -1,
-                        dest = "merge_scans")
-    parser.add_argument("--overlap",
-                        help = "How many overlapping windows were recorded for the same m/z window",
-                        type = int,
-                        default = -1,
-                        dest = "overlap_scans")
-    parser.add_argument("-r", "--framerange",
-                        help = "The minimum and maximum Frames to convert.",
-                        type = int,
-                        nargs = 2,
-                        default = [-1, -1],
-                        dest = "frame_limit")
-    args = parser.parse_args()
-    print("Running conversion with these parameters:\n ")
-    analysis_dir = args.analysis_dir
-    print("Raw file directory: ", analysis_dir)
-    output_fname = args.output_fname
-    print("Output name: ", output_fname)
-    merge_scans = args.merge_scans
-    print("Scans to merge: ", merge_scans)
-    overlap_scans = args.overlap_scans
-    print("Overlapping scans: ", overlap_scans)
-    frame_limit = args.frame_limit
-    print("Frame limits: ", frame_limit)
-
-    # if len(sys.argv) < 3:
-    #     raise RuntimeError("need arguments: tdf_directory output.mzML")
-
-    # analysis_dir = sys.argv[1]
-    # output_fname = sys.argv[2]
-
-    if sys.version_info.major == 2:
-        analysis_dir = unicode(analysis_dir)
-
-    # merge_scans = -1
-    # if len(sys.argv) > 3:
-    #     merge_scans = int(sys.argv[3])
-    #     print("Will merge", merge_scans, "scans")
-
-    td = diapysef.timsdata.TimsData(analysis_dir)
-    conn = td.conn
-
-    # Get total frame count:
-    q = conn.execute("SELECT COUNT(*) FROM Frames")
-    row = q.fetchone()
-    N = row[0]
-    print("Analysis has {0} frames.".format(N))
-
-    consumer = get_consumer(output_fname)
-
-    if merge_scans != -1:
-        consumer = diapysef.merge_consumer.MergeConsumer(consumer, merge_scans)
-
-    if overlap_scans > 1:
-        
-        # For overlapping scans, we need to create N different consumers (N files on disk) 
-        # with different file names which will then contain the overlapped spectra 
-        
-        consumers = []
-        for k in range(overlap_scans):
-            outspl = output_fname.rsplit(".", 1)
-            outname = outspl[0] + "_" + str(k) + "." + outspl[1]
-            consumer = get_consumer(outname)
-            consumers.append(consumer)
-
-        if merge_scans != -1:
-            m_consumers = []
-            for c in consumers:
-                consumer = diapysef.merge_consumer.MergeConsumer(c, merge_scans)
-                m_consumers.append(consumer)
-            consumers = m_consumers # use the merge consumers in the overlap consumer
-
-        consumer = diapysef.splitting_consumer.SplittingConsumer(consumers)
-
-    if frame_limit[0] > -1 and frame_limit[0] <= N:
-        lower_frame = frame_limit[0]
-    elif frame_limit[0] == -1:
-        lower_frame = 0
-    else:
-        raise ValueError("Lower Frame limit is not in the permitted range of frames")
-    if frame_limit[1] > frame_limit[0] and frame_limit[1] <= N:
-        upper_frame = frame_limit[1]
-    elif frame_limit[1] == -1:
-        upper_frame = N
-    else:
-        raise ValueError("Upper Frame limit is not in the permitted range of frames")
-
-    for frame_id in range(lower_frame, upper_frame):
-        store_frame(frame_id+1, td, conn, consumer, compressFrame=True, verbose=False)
-    
-    print("Conversion completed, press Enter to continue.")
-
-if __name__ == "__main__":
-    main()
+# @TODO call the OpenSwathAssayGenerator with pyopenms
+# def run_assay_generator(paseflib, window_scheme):
+#     import pyopenms
 
