@@ -94,6 +94,7 @@ def pasef_to_tsv(evidence, msms,
         msms_irt.columns = ["raw","sequence","rt","im", "charge"]
         msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
         raw_files = msms_irt.raw.unique()
+       
         if rt_alignment is not None:
             if rt_alignment is 'linear':
                 print("Aligning retention time linearly...")
@@ -132,8 +133,21 @@ def pasef_to_tsv(evidence, msms,
                     lowess_y = list(zip(*r))[1]
                     # create an interpolation function
                     f = interp1d(lowess_x, lowess_y, bounds_error=False)
-                    nRT = f(ms[ms['Raw file'] == file]['Calibrated retention time'])
+                    nRT = np.asarray(f(ms.loc[ms['Raw file'] == file ,'Calibrated retention time'].values))
 
+                    # fit linear extrapolation for values outside of approximation
+                    # print(sum(np.isnan(nRT)))
+                    min_bound = min(lowess_x)
+                    max_bound = max(lowess_x)
+                    idx = np.asarray(np.where((ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values > max_bound)))
+
+                    # cannot use pandas.index on ms, it returns the index of the original ms data frame and not th subsetted dataframe
+
+                    lnmod = calibrate(msms_irt_sub)
+                    intercept = lnmod[1] # intercept
+                    slope = lnmod[2] # slope
+                    nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values[idx]) + intercept
+     
                     nrt = []
                     for t in nRT: nrt.append(t)
                     ms.loc[ms['Raw file'] == file, 'irt'] = list(map(str, nrt))
