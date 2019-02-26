@@ -9,6 +9,9 @@ ids = fread("ids_imbench.csv")
 #   geom_line() +
 #   theme_classic()
 
+print( "At FDR 1%")
+print( ids[FDR==0.01])
+
 colnames(ids) <- c("Analysis", "FDR", "peptide_ids")
 ggplot(ids, aes(x=FDR, y=peptide_ids, color=Analysis)) +
   geom_line(size=1.5)  + theme_bw() +
@@ -49,5 +52,14 @@ ggplot(ids_extra[FDR <= 0.025], aes(x=FDR, y=peptide_ids, color=Analysis)) +
     theme(legend.position="bottom", legend.box = "horizontal") +
     theme(text = element_text(size=20), plot.title = element_text(hjust = 0.5)) # center plot title
 
+
+ids_extra = ids_extra[Analysis == "TimsOff"]
+ggplot(ids_extra[FDR <= 0.025], aes(x=FDR, y=peptide_ids, color=Analysis)) +
+  geom_line(size=1.5)  + theme_bw() +
+    guides(fill=FALSE) +
+    xlab("FDR") + ylab("Precursor Identifications (extrapolated)") +
+    ggtitle("Identification performance of DIA-TIMS")  +
+    theme(legend.position="bottom", legend.box = "horizontal") +
+    theme(text = element_text(size=20), plot.title = element_text(hjust = 0.5)) # center plot title
 
 
