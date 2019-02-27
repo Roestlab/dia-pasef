@@ -71,9 +71,9 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         center = float(tmp[0])
         width = float(tmp[1])
         mslevel = 2
-   # new tdf 5.1 has pasef scan msms = 9 
-   elif msms == 9: # new tdf version
-        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy DiaFrameMsMsInfo.Frame FROM DiaFrameMsMsWindows INNER JOIN DiaFrameMsMsInfo ON DiaFrameMsMsWindows.WindowGroup = DiaFrameMsMsInfo.WindowGroup WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
+    # new tdf 5.1 has pasef scan msms = 9 
+    elif msms == 9:
+        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy, Frame FROM DiaFrameMsMsWindows INNER JOIN DiaFrameMsMsInfo ON DiaFrameMsMsWindows.WindowGroup = DiaFrameMsMsInfo.WindowGroup WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
         scandata = q.fetchall()
         tmp = scandata[scan_data_it]
         center = float(tmp[0])
@@ -82,7 +82,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         scan_end = int(tmp[3])
         next_scan_switch = scan_start
         mslevel = 2
-   elif msms == 8:
+    elif msms == 8:
         q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy FROM PasefFrameMsMsInfo WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
         scandata = q.fetchall()
         tmp = scandata[scan_data_it]
