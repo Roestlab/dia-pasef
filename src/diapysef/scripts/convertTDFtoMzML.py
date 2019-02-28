@@ -47,7 +47,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
       of the IM dimension.
 
       Note that msms = 2 means that we have an MS2 scan whereas msms = 8 stands
-      for pasef scan.
+      for pasef scan. (New tdf 5.1 has msms = 9 for pasef scan)
     """
     # Get a projected mass spectrum:
     q = conn.execute("SELECT NumScans, Time, Polarity, MsMsType FROM Frames WHERE Id={0}".format(frame_id))
@@ -70,6 +70,17 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         tmp = q.fetchone()
         center = float(tmp[0])
         width = float(tmp[1])
+        mslevel = 2
+    # new tdf 5.1 has pasef scan msms = 9 
+    elif msms == 9:
+        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy, Frame FROM DiaFrameMsMsWindows INNER JOIN DiaFrameMsMsInfo ON DiaFrameMsMsWindows.WindowGroup = DiaFrameMsMsInfo.WindowGroup WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
+        scandata = q.fetchall()
+        tmp = scandata[scan_data_it]
+        center = float(tmp[0])
+        width = float(tmp[1])
+        scan_start = int(tmp[2])
+        scan_end = int(tmp[3])
+        next_scan_switch = scan_start
         mslevel = 2
     elif msms == 8:
         q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy FROM PasefFrameMsMsInfo WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
