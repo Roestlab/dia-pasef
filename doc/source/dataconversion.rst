@@ -20,16 +20,20 @@ Inputs
 For detailed options and descriptions, simple type:
 
 .. code:: bash
+
    convertTDFtoMzML.py --help
+
 
 Example
 -------
 
 .. code:: bash
+
    data_dir=diaPasef_run.d
    output_file='diaPasef_run.mzML'
 
    convertTDFtoMzML.py -a=$data_dir -o=$output_file
+
 
 The converted mzML files can be processed with the assay library in ``OpenSwathWorkflow``.
 

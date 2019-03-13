@@ -6,32 +6,42 @@ Bruker sdk file is in your current working directory, and you should be able
 to import the package or call the scripts.
 
 .. code:: python
+
    import diapysef
+
 
 should import all the functions in diapysef, which allows access to the tdf data.
 
 Succefully importing diapysef should result in the following output:
+
 .. code:: python
+
    Found Bruker sdk. Access to the raw data is possible.
 
+
 Otherwise, if it results in:
+
 .. code:: python
+
    Bruker sdk not found. Some functionalities that need access to raw data will 
    not be available. To activate that functionality place libtimsdata.so (Linux) 
    or timsdata.dll in the src folder.
 
+
 Please put a the Bruker sdk file in the working directory or make a symlink.
 
 Getting Help
-============
+------------
 To get more detailed description of the available functions in diapysef, you can use 
 the python function ``help``.
 
 .. code:: python
+
    >>> import diapysef
    >>> help(diapysef)
    ...
    ...
+
 
 Data Structure
 ==============
@@ -46,15 +56,20 @@ diapysef is able to read directly into the sqlite-based .tdf raw files and store
 information about the acquisition methods.
 
 .. code:: python
+
    import diapysef as dp
    dia = pd.TimsData(pasefdata)
    win = dia.get_windows()
    win.to_csv("window_layout.csv")
    print("File Written")
 
+
 Alternatively, the function can be called directly in command line.
+
 .. code:: bash
+
    get_dia_windows.py pasefdata outputfile
+
 
 Annotation of Ion Mobility Values
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -67,6 +82,7 @@ Converting the scan numbers to 1/K0 values require a raw .tdf file that contains
 calibration information.
 
 .. code:: python
+
    import diapysef as dp
    pas = dp.PasefData(pasefdata)
    mq = dp.PasefMQData(MQout_directory)
@@ -81,10 +97,13 @@ calibration information.
    ev = mq.evidence
    ev.to_csv("evidence_1K0.csv")
 
+
 Alternative, these functions can be called in command line:
 
 .. code:: bash
+
    annotate_mq_ionmobility.py MQOUT_director Pasefdata output_prefix
+
 
 
 Visualization of window placement
@@ -96,6 +115,7 @@ time starts and ends, collision energy, etc. With these information, we can plot
 window placements in the dimensions of m/z and ion mobility.
 
 .. code:: python
+
    import diapysef as dp
    import pandas as pd
 
@@ -103,10 +123,12 @@ window placements in the dimensions of m/z and ion mobility.
    win = pd.read_csv("window_layout.csv")
    dp.plot_window_layout(windows = win)
 
+
 If you have a MaxQuant output of the library precursors, you can also map the precursors
 with the windows.
 
 .. code:: python
+
    import diapysef as dp
    import pandas as pd
    
@@ -119,9 +141,11 @@ with the windows.
 Or alternatively, the function can be called in command line.
 
 .. code:: bash
+
    plot_dia_windows.py window_layout.csv annotated_all_peptides_1K0.csv
 
 .. note::
+
    Precursor map is the allPeptides.csv file generated from MaxQuant and needs to be 
    properly annotated with 1/K0 values.
 

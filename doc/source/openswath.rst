@@ -4,7 +4,7 @@ Quantification and Identification
 Using the assay library and the mzML files, identification and quantification of peptides
 can be performed with ``OpenSwathWorkflow`` and ``PyProphet``. For detailed description 
 and documentation of the downstream analysis, please refer to `their documentation website 
-<http://openswath.org/en/latest/docs/binaries.html>_`. The newest ``OpenMS`` version 2.4.0 
+<http://openswath.org/en/latest/docs/binaries.html>`_. The newest ``OpenMS`` version 2.4.0 
 includes functionalities in handling ion mobility informations. Here are some of the 
 input parameters that are additional to the regular parameters.
 
@@ -32,5 +32,5 @@ Statistical Validation
 
 ``PyProphet`` can take the scores generated from ``OpenSwathWorkflow`` and statistically validate 
 the precursor identifications. For detailed documentation, please refer to `the website 
-<http://openswath.org/en/latest/docs/binaries.html#pyprophet>_`. 
+<http://openswath.org/en/latest/docs/binaries.html#pyprophet>`_. 
 

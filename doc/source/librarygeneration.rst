@@ -36,6 +36,7 @@ MaxQuant output directory (annotated with ion mobiltiy 1/K0) and iRT file,
 we can generate an OpenSwath readable format of library.
 
 .. code:: python
+
    import diapysef as dp
    import pandas as pd
    
@@ -63,11 +64,13 @@ suggest alignment using ``nonlinear`` for ``rt_alignment`` and ``linear`` for
 Alternatively, we also have a script as a commandline tool that can be called with:
 
 .. code:: bash
+
    python create_library.py
 
 For details and options of the script, simply type:
 
 .. code:: bash
+
    python create_library.py --help
 
 
@@ -94,6 +97,7 @@ Inputs
 An example would be this:
 
 .. code:: bash
+
    OpenSwathAssayGenerator -in mqout.tsv -out hela_assaylib.TraML \ 
                            -swath_windows_file window_setting.txt
    
@@ -115,6 +119,7 @@ Inputs
 An example would be this:
 
 .. code:: bash
+
    OpenSwathDecoyGenerator -in hela_assaylib.TraML \
                            -out hela_target_decoy_assaylib.TraML \
                            -method pseudo-reverse \

@@ -16,7 +16,9 @@ in a python virtual environment. After downloading the file, you can install it 
 typing
 
 .. code-block:: bash
+
    pip install diapysef-0.3.3-py3-none-any.whl
+
 
 Downstream data analysis with ion mobility is processed with OpenMS version 2.4.0 with
 OpenSwath bindings. Detailed documentation of ``OpenSWath`` can be found ` here 
@@ -29,6 +31,7 @@ To download diapysef from :index:`source` and the developmental version, you hav
 clone the github repository (not published yet) and compile for the .whl file.
 
 .. code-block:: bash
+
    git clone git@github.com:Roestlab/dia-pasef.git
    pip install setup.py
    python setup.py sdist bdist_wheel

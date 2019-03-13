@@ -1,0 +1,22 @@
+\select@language {english}
+\contentsline {chapter}{\numberline {1}Data Access}{3}{chapter.1}
+\contentsline {section}{\numberline {1.1}Getting Help}{3}{section.1.1}
+\contentsline {chapter}{\numberline {2}Data Structure}{5}{chapter.2}
+\contentsline {chapter}{\numberline {3}Data Visualization}{7}{chapter.3}
+\contentsline {chapter}{\numberline {4}Library Generation}{9}{chapter.4}
+\contentsline {section}{\numberline {4.1}Annotating Ion Mobility}{9}{section.4.1}
+\contentsline {section}{\numberline {4.2}Correcting RT and IM values}{9}{section.4.2}
+\contentsline {section}{\numberline {4.3}Generating Assay Library}{10}{section.4.3}
+\contentsline {subsection}{\numberline {4.3.1}Standardize Assay Library}{10}{subsection.4.3.1}
+\contentsline {subsection}{\numberline {4.3.2}Inputs}{10}{subsection.4.3.2}
+\contentsline {subsection}{\numberline {4.3.3}Generate Decoy}{10}{subsection.4.3.3}
+\contentsline {subsection}{\numberline {4.3.4}Inputs}{10}{subsection.4.3.4}
+\contentsline {chapter}{\numberline {5}Data Conversion}{11}{chapter.5}
+\contentsline {section}{\numberline {5.1}Inputs}{11}{section.5.1}
+\contentsline {section}{\numberline {5.2}Example}{11}{section.5.2}
+\contentsline {chapter}{\numberline {6}Quantification and Identification}{13}{chapter.6}
+\contentsline {section}{\numberline {6.1}Inputs}{13}{section.6.1}
+\contentsline {section}{\numberline {6.2}Output}{13}{section.6.2}
+\contentsline {section}{\numberline {6.3}Statistical Validation}{13}{section.6.3}
+\contentsline {chapter}{\numberline {7}Indices and tables}{15}{chapter.7}
+\contentsline {section}{\numberline {7.1}Acknowledgements}{15}{section.7.1}

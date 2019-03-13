@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to diapysef!
-====================================
+Summary
+========
 diapysef is a convenience package for working with DIA-PASEF data. It has 
 functionalities to convert Bruker raw files into a format that OpenMS can 
 understand. Thus OpenSwath can be used to analyze the data and TOPPView can
@@ -18,9 +18,8 @@ allow conversions of raw data (Bruker tdf.d), generation of spectral library,
 basic signal-processing (compression, filtering), and simple visualization 
 of the raw data.
 
-Note: 
-* The current documentation relates to the 0.3.3 version of diapysef.
-* Please acquire the Bruker tdf-sdk through official distributions. 
+Note: The current documentation relates to the 0.3.3 version of diapysef.
+Note: Please acquire the Bruker tdf-sdk through official distributions. 
 
 .. toctree::
    :maxdepth: 2
@@ -58,5 +57,11 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+
+Acknowledgements
+----------------
+The tools and workflows are collaboratively developed with the data acquired 
+by the `Mann Group at MPI, Bremen <https://www.biochem.mpg.de/en/rd/mann>`_ , 
+the `Aebersold Group at IMSB, ETH Zurich <http://www.imsb.ethz.ch/research/aebersold.html>`_,
+and Bruker Daltonics. The core pipeline is also referenced from `OpenMS <http://www.openms.org>`_ 
+and `PyProphet <https://github.com/PyProphet>`_, and `msproteomicstools <https://github.com/msproteomicstools>`_.
