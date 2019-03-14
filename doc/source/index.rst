@@ -64,4 +64,4 @@ The tools and workflows are collaboratively developed with the data acquired
 by the `Mann Group at MPI, Bremen <https://www.biochem.mpg.de/en/rd/mann>`_ , 
 the `Aebersold Group at IMSB, ETH Zurich <http://www.imsb.ethz.ch/research/aebersold.html>`_,
 and Bruker Daltonics. The core pipeline is also referenced from `OpenMS <http://www.openms.org>`_ 
-and `PyProphet <https://github.com/PyProphet>`_, and `msproteomicstools <https://github.com/msproteomicstools>`_.
+, `PyProphet <https://github.com/PyProphet>`_, and `msproteomicstools <https://github.com/msproteomicstools>`_.
