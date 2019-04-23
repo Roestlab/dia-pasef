@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='diapysef',
-      version='0.3.3',
+      version='0.3.4.dev1',
       description='Analysis and visualization of DIA PASEF data',
       long_description=readme(),
       author='Max Frank, Annie Ha, Hannes Roest',

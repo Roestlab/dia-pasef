@@ -4,9 +4,10 @@ import os, sys
 import pandas as pd
 import numpy as np
 import sqlite3
-from .timsdata import TimsData
+from diapysef.timsdata import TimsData
 
-class PasefMQData:
+class MQData:
+    """Read outputs of maxquant for library generation functionalities."""
 
     def __init__ (self, maxquant_directory):
         if(not os.path.exists(maxquant_directory)):
@@ -14,6 +15,30 @@ class PasefMQData:
         self.evidence_data = os.path.join(maxquant_directory, "evidence.txt")
         self.msms_data = os.path.join(maxquant_directory, "msms.txt")
         self.all_peptides_data = os.path.join(maxquant_directory, "allPeptides.txt")
+
+    def get_evidence (self):
+        """Reads the evidence output of maxquant as pandas dataframe."""
+        try:
+            self.evidence = pd.read_csv(self.evidence_data, sep = '\t')
+        except:
+            print("Data File %s not found. Make sure you specified the right directory." % self.evidence_data)
+
+    def get_msms (self):
+        """Reads the msms output of maxquant as pandas dataframe."""
+        try:
+            self.msms = pd.read_csv(self.msms_data)
+        except:
+            print("Data File %s not found. Make sure you specified the right directory." % self.msms_data)
+
+    def get_all_peptides (self):
+        """Reads the allPeptides output of maxquant as pandas dataframe."""
+        try:
+            self.all_peptides = pd.read_csv(self.all_peptides_data)
+        except:
+            print("Data File %s not found. Make sure you specified the right directory." % self.all_peptides_data)
+
+class PasefMQData(MQData):
+    """Reads outputs of maxquant with ion mobility functionalities."""
 
     def get_evidence (self, timsdata = None):
         """Reads the evidence output of maxquant as pandas dataframe."""
@@ -23,13 +48,6 @@ class PasefMQData:
             print("Data File %s not found. Make sure you specified the right directory." % self.evidence_data)
         if timsdata is not None:
             self.annotate_ion_mobility(timsdata)
-
-    def get_msms (self):
-        """Reads the msms output of maxquant as pandas dataframe."""
-        try:
-            self.msms = pd.read_table(self.msms_data)
-        except:
-            print("Data File %s not found. Make sure you specified the right directory." % self.msms_data)
 
     def get_all_peptides (self, timsdata = None):
         """Reads the allPeptides output of maxquant as pandas dataframe."""
