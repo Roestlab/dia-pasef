@@ -90,6 +90,9 @@ class TimsData:
 
             self.conn = sqlite3.connect(os.path.join(analysis_directory, "analysis.tdf"))
 
+            q = self.conn.execute("SELECT MsMsType FROM Frames")
+            self.ms2_id = max(int(q.fetchall()[0]))
+
             self.initial_frame_buffer_size = 128 # may grow in readScans()
             self.dll = dll
 
@@ -203,7 +206,7 @@ class TimsData:
 
 class DiaPasefData(TimsData):
 
-    def get_cycle_length (self, pasef_ms2_id = 8):
+    def get_cycle_length (self):
         firstcycle = True
         initial_ms1 = True
         cycle_length = 0
@@ -211,24 +214,24 @@ class DiaPasefData(TimsData):
         while (firstcycle):
             mstype = self.conn.execute("SELECT MsMsType FROM Frames LIMIT {0},1".format(row)).fetchone()
             row += 1
-            if mstype[0] == pasef_ms2_id:
+            if mstype[0] == self.ms2_id:
                 cycle_length += 1
                 initial_ms1 = False
             elif(initial_ms1 != True):
                 firstcycle = False
         return cycle_length
 
-    def get_windows_per_frame(self, pasef_ms2_id = 8):
-        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType=%d AND Frame = (SELECT MIN(Frame) FROM PasefFrameMsMsInfo as fr)" % pasef_ms2_id)
+    def get_windows_per_frame(self):
+        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType={0} AND Frame = (SELECT MIN(Frame) FROM PasefFrameMsMsInfo as fr)".format(self.ms2_id))
         windows = q.fetchall()
         return len(windows)
 
     def get_windows(self):
         """Extracts the window scheme from the first cycle of a tims file"""
-        pasef_ms2_id = 8 # diaPASEF ms2 scans are denoted by 8 instead of 2
-        cycle_length = self.get_cycle_length(pasef_ms2_id)
-        wpf = self.get_windows_per_frame(pasef_ms2_id)
-        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType=%d LIMIT %d" % (pasef_ms2_id, cycle_length*wpf))
+        #pasef_ms2_id = 8 # diaPASEF ms2 scans are denoted by 8 instead of 2
+        cycle_length = self.get_cycle_length(self.ms2_id)
+        wpf = self.get_windows_per_frame(self.ms2_id)
+        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType={0} LIMIT {1}" .format(self.ms2_id, cycle_length*wpf))
         frames = q.fetchall()
         colnames = [description[0] for description in q.description]
         resframe = pd.DataFrame(data = frames, columns = colnames)
