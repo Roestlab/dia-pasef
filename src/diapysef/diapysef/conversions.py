@@ -65,7 +65,7 @@ def align_rt(msms_irt, ms, runs, rt_alignment, pdfout, remove_outliers = True):
         lowess = smnonlinear.nonparametric.lowess
         for file in runs:
             msms_irt_sub = msms_irt[msms_irt.raw == file]
-            msms_irt_sub = msms_irt_sub.loc[:,["rt","irt"]
+            msms_irt_sub = msms_irt_sub.loc[:,["rt","irt"]]
             if remove_outliers is True:
                 msms_irt_sub = outliers(msms_irt_sub)[0]
             # Calculate span
@@ -128,6 +128,19 @@ def align_im(msms_irt, ms, runs, im_alignment):
         ms['iim'] = ms['imcol']
     return(ms)
 
+def reformat_mods(data, column):
+    data[column] = data[column].str.replace('_', '')
+    data[column] = data[column].str.replace("(ox)","Oxidation")
+    data[column] = data[column].str.replace("(ph)","Phospho")
+    data[column] = data[column].str.replace("C","C(Carbamidomethyl)")
+    data[column] = data[column].str.replace("(ac)","Acetylation")
+
+    data[column] = data[column].str.replace("\\(UniMod:4\\)","C(Carbamidomethyl)")
+    data[column] = data[column].str.replace("\\(UniMod:1\\)","Acetylation")
+    data[column] = data[column].str.replace("\\(UniMod:35\\)","Oxidation")
+    data[column] = data[column].str.replace("\\(UniMod:21\\)","Phospho")
+    return(data)
+
 def pasef_to_tsv(evidence, msms,
                  irt_file = None,
                  ion_mobility = None,
@@ -139,70 +152,91 @@ def pasef_to_tsv(evidence, msms,
     if ion_mobility is not None:    
         ev = evidence.loc[:, ["id", "Calibrated retention time", "Ion mobility index", im_column]]
         ev = ev.rename(columns = {im_column:'imcol'})
-    else:
-        ev = evidence.loc[:, ["id", "Calibrated retention time"]]
-    ev = ev.rename(columns = {'id':'Evidence ID'})
-    ms = pd.merge(msms, ev, on = 'Evidence ID')
-    ms = ms.dropna(subset=["Calibrated retention time"]) # Some precursors in MQ are not annotated with a RT
+        ev = ev.rename(columns = {'id':'Evidence ID'})
+        ms = pd.merge(msms, ev, on = 'Evidence ID')
+        ms = ms.dropna(subset=["Calibrated retention time"]) # Some precursors in MQ are not annotated with a RT
 
-    # Replace modifications in the MQ output so that they are OpenMS readable
-    ms['Modified sequence'] = ms['Modified sequence'].str.replace('_', '')
-    ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ox)","Oxidation")
-    ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ph)","Phospho")
-    ms['Modified sequence'] = ms['Modified sequence'].str.replace("C","C(Carbamidomethyl)")
-    ms['Modified sequence'] = ms['Modified sequence'].str.replace("(ac)","Acetylation")
-    ms = ms.rename(columns = {'Modified sequence':'ModifiedPeptideSequence'})
-
-    if irt_file is not None:
-        if isinstance(irt_file, str):
-            irt = pd.read_table(irt_file)
-        elif isinstance(irt_file, pd.DataFrame):
-            irt = irt_file
-        else:
-            print("irt_file must be a path to an irt table or a pd.DataFrame object.")
-            sys.exit()
-
-            # Prepare iRT table
-        if irt.shape[1] > 2:
-            irt = irt.loc[:, ["ModifiedPeptideSequence", "NormalizedRetentionTime", "PrecursorIonMobility","PrecursorCharge"]]
-            irt = irt.drop_duplicates()
-
-        if ion_mobility is not None:
+        # Replace MQ mods to OpenMS mods
+        ms = reformat_mods(ms, "Modified sequence")
+        ms = ms.rename(columns = {'Modified sequence':'ModifiedPeptideSequence'})
+        
+        if irt_file is not None:
+            if isinstance(irt_file,str):
+               irt = pd.read_table(irt_file)
+            elif isinstance(irt_file, pd.DataFrame):
+                irt = irt_file
+            else:
+                print("irt_file must be a path to an irt table or a pd.DataFrame object.")
+                sys.exit()
+           # Prepare iRT table
+            if irt.shape[1] > 2:
+                irt = irt.loc[:, ["ModifiedPeptideSequence", "NormalizedRetentionTime", "PrecursorIonMobility","PrecursorCharge"]]
+                irt = irt.drop_duplicates()
             irt.columns = ["sequence","irt", "iim", "charge"]
-        else:
-            irt.columns = ["sequence","irt", "charge"]
-        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:4\\)","C(Carbamidomethyl)")
-        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:1\\)","Acetylation")
-        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:35\\)","Oxidation")
-        irt['sequence'] = irt['sequence'].str.replace("\\(UniMod:21\\)","Phospho")
-
-        # Use the irt peptides present in the MQ output to calibrate
-        msms_irt = ms[ms["ModifiedPeptideSequence"].isin(irt["sequence"])]
-        ## We chose the best id of each peptide (only one charge state for alignment)
-        msms_irt = msms_irt.loc[msms_irt.groupby(["Raw file","ModifiedPeptideSequence"])['PEP'].idxmin()]
-
-        if ion_mobility is not None:
+            irt = reformat_mods(irt, 'sequence')
+            
+            # Use the irt peptides present in the MQ output to calibrate
+            msms_irt = ms[ms["ModifiedPeptideSequence"].isin(irt["sequence"])]
+            ## We chose the best id of each peptide (only one charge state for alignment)
+            msms_irt = msms_irt.loc[msms_irt.groupby(["Raw file","ModifiedPeptideSequence"])['PEP'].idxmin()]
             msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Calibrated retention time", "imcol", "Charge"]]
             msms_irt.columns = ["raw","sequence","rt","im", "charge"]
-        else:
-            msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Calibrated retention time", "Charge"]]
-            msms_irt.columns = ["raw","sequence","rt", "charge"]
-
-        msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
-        raw_files = msms_irt.raw.unique()
+            msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
+            raw_files = msms_irt.raw.unique()
        
-        if rt_alignment is not None:
-            ms = align_rt(msms_irt, ms, raw_files, rt_alignment, pdfout, remove_outliers = True)
+            if rt_alignment is not None:
+                ms = align_rt(msms_irt, ms, raw_files, rt_alignment, pdfout, remove_outliers = True)
+            else:
+                ms['irt'] = ms['Calibrated retention time']
+
+            if im_alignment is not None:
+                ms = align_im(msms_irt, ms, raw_files, im_alignment)
+            else:
+                ms['iim'] = ms['imcol']
         else:
             ms['irt'] = ms['Calibrated retention time']
-
-        if im_alignment is not None:
-            ms = align_im(msms_irt, ms, raw_files, im_alignment)
-        else:
             ms['iim'] = ms['imcol']
+
     else:
-        ms['irt'] = ms['Calibrated retention time']
-        ms['iim'] = ms['imcol']
+        ev = evidence.loc[:, ["id", "Calibrated retention time"]]
+        ev = ev.rename(columns = {'id':'Evidence ID'})
+        ms = pd.merge(msms, ev, on = 'Evidence ID')
+        ms = ms.dropna(subset=["Calibrated retention time"]) # Some precursors in MQ are not annotated with a RT
+
+        # Replace MQ mods to OpenMS mods
+        ms = reformat_mods(ms, "Modified sequence")
+        ms = ms.rename(columns = {'Modified sequence':'ModifiedPeptideSequence'})
+
+        if irt_file is not None:
+            if isinstance(irt_file,str):
+               irt = pd.read_table(irt_file)
+            elif isinstance(irt_file, pd.DataFrame):
+                irt = irt_file
+            else:
+                print("irt_file must be a path to an irt table or a pd.DataFrame object.")
+                sys.exit()
+           # Prepare iRT table
+            if irt.shape[1] > 2:
+                irt = irt.loc[:, ["ModifiedPeptideSequence", "NormalizedRetentionTime","PrecursorCharge"]]
+                irt = irt.drop_duplicates()
+            irt.columns = ["sequence","irt", "charge"]
+            irt = reformat_mods(irt, 'sequence')
+
+            # Use the irt peptides present in the MQ output to calibrate
+            msms_irt = ms[ms["ModifiedPeptideSequence"].isin(irt["sequence"])]
+            ## We chose the best id of each peptide (only one charge state for alignment)
+            msms_irt = msms_irt.loc[msms_irt.groupby(["Raw file","ModifiedPeptideSequence"])['PEP'].idxmin()]
+            msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Calibrated retention time", "Charge"]]
+            msms_irt.columns = ["raw","sequence","rt", "charge"]
+            msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
+            raw_files = msms_irt.raw.unique()
+
+            if rt_alignment is not None:
+                ms = align_rt(msms_irt, ms, raw_files, rt_alignment, pdfout, remove_outliers = True)
+            else:
+                ms['irt'] = ms['Calibrated retention time']
+        else:
+            ms['irt'] = ms['Calibrated retention time']
 
     # Filter for best identification (lowest PEP)
     ms = ms.loc[ms.groupby(["ModifiedPeptideSequence", "Charge"])['PEP'].idxmin()]
@@ -232,7 +266,7 @@ def pasef_to_tsv(evidence, msms,
     # msl2 = msl2[["transition_group_id","PrecursorMz","ProductMz","PrecursorCharge","Tr_recalibrated","LibraryIntensity","PeptideSequence","FullUniModPeptideName","ProteinName", "PrecursorIonMobility"]]
     msl2['decoy'] = 0
     msl2['transition_name'] = ['_'.join(str(i) for i in z) for z in zip(msl2.transition_group_id,msl2.PrecursorMz,msl2.ProductMz)]
-
+    msl2=msl2.dropna(subset=['LibraryIntensity'])
     msl2=msl2.drop_duplicates()
     # Write output
     # msl2.to_csv("pasefLib.tsv", sep = "\t", index=False)
