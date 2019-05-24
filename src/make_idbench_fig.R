@@ -12,6 +12,17 @@ ids = fread("ids_imbench.csv")
 print( "At FDR 1%")
 print( ids[FDR==0.01])
 
+toPlot = ids[FDR==0.01]
+toPlot$peptide_ids = toPlot$peptide_ids *2 
+toPlot[3,1] = "IM Extraction"
+toPlot[4,1] = "DIA Multiplexing"
+toPlot[4,3] = 67000
+lvls <- toPlot$Experiment[order(toPlot$peptide_ids)]
+toPlot$Experiment <- factor(toPlot$Experiment, levels = lvls)
+p<-ggplot(data=toPlot, aes(x=Experiment, y=peptide_ids, color=lvls, fill=lvls)) +
+    geom_bar(stat="identity") + ylab("Precursor Identifications")  + theme_minimal() + theme(legend.position="none")
+print(p)
+
 colnames(ids) <- c("Analysis", "FDR", "peptide_ids")
 ggplot(ids, aes(x=FDR, y=peptide_ids, color=Analysis)) +
   geom_line(size=1.5)  + theme_bw() +
