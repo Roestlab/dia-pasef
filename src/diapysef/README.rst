@@ -83,7 +83,7 @@ This can be done with a commandline tool:
 
 Or in python:
 
-.. code:: ipython3
+.. code:: python3
 
     import diapysef as dp
     
@@ -118,7 +118,7 @@ a maxquant output using the calibration information in the raw file.
 
 Or in python:
 
-.. code:: ipython3
+.. code:: python3
 
     import diapysef as dp
     
@@ -165,7 +165,7 @@ We provide the following plotting function, as a commandline script
 
 Or in python:
 
-.. code:: ipython3
+.. code:: python3
 
     import diapysef as dp
     import pandas as pd
