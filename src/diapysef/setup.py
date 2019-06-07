@@ -4,10 +4,14 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
+desc = """\
+Analysis, conversion and visualization of diaPASEF data."""
+
 setup(name='diapysef',
-      version='0.3.4.dev1',
-      description='Analysis and visualization of DIA PASEF data',
+      version='0.3.4.dev2',
+      description=desc,
       long_description=readme(),
+      url="https://github.com/Roestlab/dia-pasef",
       author='Max Frank, Annie Ha, Hannes Roest',
       author_email='hannes.rost@utoronto.ca',
       license='MIT',
