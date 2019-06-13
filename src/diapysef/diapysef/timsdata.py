@@ -91,7 +91,11 @@ class TimsData:
             self.conn = sqlite3.connect(os.path.join(analysis_directory, "analysis.tdf"))
 
             q = self.conn.execute("SELECT MsMsType FROM Frames")
-            self.ms2_id = max(int(q.fetchall()[0]))
+
+            COLUMN = 0
+            frames = q.fetchall()
+            ms2_ids = [row[COLUMN] for row in frames]
+            self.ms2_id = max(ms2_ids)
 
             self.initial_frame_buffer_size = 128 # may grow in readScans()
             self.dll = dll
