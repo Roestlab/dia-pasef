@@ -26,14 +26,14 @@ class MQData:
     def get_msms (self):
         """Reads the msms output of maxquant as pandas dataframe."""
         try:
-            self.msms = pd.read_csv(self.msms_data)
+            self.msms = pd.read_csv(self.msms_data, sep = '\t')
         except:
             print("Data File %s not found. Make sure you specified the right directory." % self.msms_data)
 
     def get_all_peptides (self):
         """Reads the allPeptides output of maxquant as pandas dataframe."""
         try:
-            self.all_peptides = pd.read_csv(self.all_peptides_data)
+            self.all_peptides = pd.read_csv(self.all_peptides_data, sep ='\t')
         except:
             print("Data File %s not found. Make sure you specified the right directory." % self.all_peptides_data)
 
