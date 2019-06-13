@@ -74,7 +74,7 @@ def main(ion_mobility, pasefdata, mqout, irt, outfile, rt_alignment, im_alignmen
         im_alignment = None
     ptsv = dp.pasef_to_tsv(ev, msms, irt_file=pirt, ion_mobility=ion_mobility, im_column=im_column, rt_alignment=rt_alignment, im_alignment = im_alignment)
 
-    ptsv.to_csv(outfile,sep="\t")
+    ptsv.to_csv(outfile,sep="\t", index = False)
     print('mqout library generated, proceed to OpenSwathAssayGenerator.')
 
 
