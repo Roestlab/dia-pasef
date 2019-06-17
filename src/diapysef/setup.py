@@ -8,7 +8,7 @@ desc = """\
 Analysis, conversion and visualization of diaPASEF data."""
 
 setup(name='diapysef',
-      version='0.3.4.dev3',
+      version='0.3.4.dev4',
       description=desc,
       long_description=readme(),
       url="https://github.com/Roestlab/dia-pasef",
@@ -30,5 +30,6 @@ setup(name='diapysef',
                'scripts/annotate_mq_ionmobility.py',
                'scripts/plot_dia_windows.py',
                'scripts/convertTDFtoMzML.py',
-               'scripts/create_library.py'],
+               'scripts/create_library.py',
+               'scripts/high_precision_irt.py'],
       zip_safe=False)
