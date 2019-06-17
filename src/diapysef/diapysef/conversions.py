@@ -135,7 +135,7 @@ def reformat_mods(data, column):
     data[column] = data[column].str.replace("C","C(Carbamidomethyl)")
     data[column] = data[column].str.replace("(ac)","Acetylation")
 
-    data[column] = data[column].str.replace("\\(UniMod:4\\)","C(Carbamidomethyl)")
+    data[column] = data[column].str.replace("\\(UniMod:4\\)","(Carbamidomethyl)")
     data[column] = data[column].str.replace("\\(UniMod:1\\)","Acetylation")
     data[column] = data[column].str.replace("\\(UniMod:35\\)","Oxidation")
     data[column] = data[column].str.replace("\\(UniMod:21\\)","Phospho")
