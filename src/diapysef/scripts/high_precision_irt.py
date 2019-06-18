@@ -11,6 +11,7 @@ import sys
 
 if len(sys.argv) < 4:
     print("Usage: high_precision_irt.py mqout_dir output_file peptide_number_cutoff")
+    print("Description: This script will generate a set of "high precision iRT" peptides as described in Bruderet et al (2016) from MaxQuant output to derive a set of conserved, high-intensity peptides.") 
     sys.exit()
 
 mqout_dir = sys.argv[1]
