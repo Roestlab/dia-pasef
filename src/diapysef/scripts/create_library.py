@@ -38,7 +38,7 @@ def main(ion_mobility, pasefdata, mqout, irt, outfile, rt_alignment, im_alignmen
         mq.get_all_peptides()
         all_pep = mq.all_peptides
         if 'Ion mobility index' not in all_pep:
-            print('Ion mobility information not found. Please specify --ion_mobility to False')
+            print('WARNING: Ion mobility information not found. Please specify --ion_mobility to False')
             sys.exit()
         pas = PasefData(pasefdata)
         print('Annotating ion mobility on MQout all_peptides file ...')
