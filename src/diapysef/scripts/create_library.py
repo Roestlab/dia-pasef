@@ -34,9 +34,13 @@ from diapysef.pasefdata import MQData
 
 def main(ion_mobility, pasefdata, mqout, irt, outfile, rt_alignment, im_alignment, all_peptides_out, evidence_out):
     if ion_mobility is True:
-        pas = PasefData(pasefdata)
         mq = PasefMQData(mqout)
         mq.get_all_peptides()
+        all_pep = mq.all_peptides
+        if 'Ion mobility index' not in all_pep:
+            print('Ion mobility information not found. Please specify --ion_mobility to False')
+            sys.exit()
+        pas = PasefData(pasefdata)
         print('Annotating ion mobility on MQout all_peptides file ...')
         mq.annotate_ion_mobility(pas)
         all_pep = mq.all_peptides
