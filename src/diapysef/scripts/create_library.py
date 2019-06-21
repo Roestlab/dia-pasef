@@ -67,7 +67,6 @@ def main(ion_mobility, pasefdata, mqout, irt, outfile, rt_alignment, im_alignmen
     ############################################################
     if ion_mobility is True:
         im_column ='IonMobilityIndexK0'
-        ion_mobility = True
     else:
         im_column = None
         im_alignment = None
