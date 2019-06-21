@@ -20,7 +20,7 @@ from diapysef.pasefdata import MQData
 ##############################################################
 
 @click.command()
-@click.option('--ion_mobility', envvar='ion_mobility', required=True, default=True, help='Data type of ion mobility.')
+@click.option('--ion_mobility', envvar='ion_mobility', required=True, default=True, help='MaxQuant output contains ion mobility information (set to false for regular MaxQuant output without ion mobility).')
 @click.option('--pasefdata', envvar='pasefdata', type=click.Path(exists=True), help='Pasef data file path.')
 @click.option('--mqout' , envvar='mqout', required=True, type=click.Path(exists=True), help='Directory from MaxQuant output.')
 @click.option('--irt', envvar='irt',required=True, type=click.Path(exists=True), help='Full path file of iRT assay library.')
