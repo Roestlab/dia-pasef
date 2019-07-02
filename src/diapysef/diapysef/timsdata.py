@@ -226,16 +226,24 @@ class DiaPasefData(TimsData):
         return cycle_length
 
     def get_windows_per_frame(self):
-        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType={0} AND Frame = (SELECT MIN(Frame) FROM PasefFrameMsMsInfo as fr)".format(self.ms2_id))
+        if self.ms2_id == 8:
+            q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType={0} AND Frame = (SELECT MIN(Frame) FROM PasefFrameMsMsInfo as fr)".format(self.ms2_id))
+        elif self.ms2_id == 9:
+            q = self.conn.execute("SELECT * FROM Frames INNER JOIN DiaFrameMsMsInfo ON Frames.Id = DiaFrameMsMsInfo.Frame INNER JOIN DiaFrameMsMsWindows ON DiaFrameMsMsInfo.WindowGroup = DiaFrameMsMsWindows.WindowGroup WHERE MsMsType={0} AND Frame = (SELECT MIN(Frame) FROM DiaFrameMsMsInfo as fr)".format(self.ms2_id))
         windows = q.fetchall()
         return len(windows)
 
     def get_windows(self):
         """Extracts the window scheme from the first cycle of a tims file"""
         #pasef_ms2_id = 8 # diaPASEF ms2 scans are denoted by 8 instead of 2
-        cycle_length = self.get_cycle_length(self.ms2_id)
-        wpf = self.get_windows_per_frame(self.ms2_id)
-        q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType={0} LIMIT {1}" .format(self.ms2_id, cycle_length*wpf))
+        if self.ms2_id == 8:
+            cycle_length = self.get_cycle_length(self.ms2_id)
+            wpf = self.get_windows_per_frame(self.ms2_id)
+            q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType={0} LIMIT {1}" .format(self.ms2_id, cycle_length*wpf))
+        elif self.ms2_id == 9:
+            cycle_length = self.get_cycle_length(self.ms2_id)
+            wpf = self.get_windows_oer_frame(self.ms2_id)
+            q = self.conn.execute("SELECT * FROM Frames INNER JOIN DiaFrameMsMsInfo ON Frames.Id = DiaFrameMsMsInfo.Frame INNER JOIN DiaFrameMsMsWindows ON DiaFrameMsMsInfo.WindowGroup = DiaFrameMsMSWindows.WindowGroup WHERE MsMsType={0} LIMIT {1}".format(self.ms2_id, cycle_length*wpf))
         frames = q.fetchall()
         colnames = [description[0] for description in q.description]
         resframe = pd.DataFrame(data = frames, columns = colnames)
