@@ -9,7 +9,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy.interpolate import interp1d
 import statsmodels.api as smnonlinear
 
-def calibrate(data, plot = True, pdf = "rtcalibration"):
+def calibrate(data, plot = True, pdf = "rtcalibration.pdf"):
     """Fits a linear model to the irts"""
     filename = data.iloc[0,0]
     mod = sm.ols(formula = 'irt ~ rt', data = data)
