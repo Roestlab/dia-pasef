@@ -11,7 +11,7 @@ import sys
 
 if len(sys.argv) < 4:
     print("Usage: high_precision_irt.py mqout_dir output_file quality_cutoff")
-    print("Description: This script will generate a set of "high precision iRT" peptides as described in Bruderer et al (2016) from MaxQuant output to derive a set of conserved, high-intensity peptides.") 
+    print('Description: This script will generate a set of "high precision iRT" peptides as described in Bruderer et al (2016) from MaxQuant output to derive a set of conserved, high-intensity peptides.') 
     sys.exit()
 
 mqout_dir = sys.argv[1]
@@ -78,14 +78,15 @@ NormalizedRT = (rt - min(rt)) / (max(rt) - min(rt)) * 100
 
 ms['NormalizedRetentionTime'] = NormalizedRT
 
-# Filter by PEP (1%) and of these only take the top half of these ...
-ms = ms[ms['PEP'] < 0.01]
-ms = ms[ms['Score'] > ms['Score'].quantile(0.5)]
-ms = ms[ms['Peak coverage'] > ms['Peak coverage'].quantile(0.2)]
 ms = ms.sort_values("PEP", ascending = True)
 
-ms = ms[0: cutoff]
+# Filter by PEP (1%) and of these only take the top half of these ...
+ms = ms[ms['PEP'] < 0.01]
+ms = ms[ms['PEP'] < ms['Score'].quantile(0.5)]
 
+# Then take the number of peptide cutoff as specified
+if cutoff is not None:
+    ms = ms[0: cutoff]
 
 ms1 = ms.loc[:, ["id", "m/z", "Masses", "Charge", "NormalizedRetentionTime","PrecursorIonMobility", "Intensities", "Sequence", "ModifiedPeptideSequence","Proteins"]]
 
@@ -105,8 +106,4 @@ ms12['transition_name'] = ['_'.join(str(i) for i in z) for z in zip(ms12.transit
 ms12=ms12.drop_duplicates()
 
 ms12.to_csv(outfile, sep = "\t", index=False)
-
-
-
-
 
