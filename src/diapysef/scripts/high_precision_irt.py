@@ -60,8 +60,17 @@ msms_irt = msms_irt.rename(columns = {'Modified sequence' : "ModifiedPeptideSequ
 
 ev_file = os.path.join(os.path.dirname(msms_files[np.argmin(pep)]), 'evidence.txt')
 ev = pd.read_csv(ev_file, sep = '\t')
-ev = ev.loc[:, ["id", "Calibrated retention time", 'Calibrated 1/K0', 'Ion mobility index']]
-ev = ev.rename(columns = {'id':'Evidence ID', 'Calibrated 1/K0':'PrecursorIonMobility'})
+
+if 'Calibrated 1/K0' in ev.columns:
+    ev = ev.loc[:, ["id", "Calibrated retention time", 'Calibrated 1/K0', 'Ion mobility index']]
+    ev = ev.rename(columns = {'id':'Evidence ID', 'Calibrated 1/K0':'PrecursorIonMobility'})
+    elif 'IonMobilityIndexK0' in ev.columns:
+        ev = ev.loc[:, ["id", "Calibrated retention time", "IonMobilityIndexK0"]]
+        ev = ev.rename(columns = {'id':'Evidence ID', 'IonMobilityK0':'PrecursorIonMobility'})
+    else:
+        ev = ev.loc[:, ["id", "Calibrated retention time"]]
+        ev = ev.rename(columns = {'id': 'Evidence ID'})
+
 ms = pd.merge(msms_irt, ev, on = 'Evidence ID')
 
 rt = ms.loc[:, 'Calibrated retention time']
