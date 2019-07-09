@@ -143,13 +143,13 @@ def reformat_mods(data, column):
 
 def pasef_to_tsv(evidence, msms,
                  irt_file = None,
-                 ion_mobility = None,
+                 ion_mobility = False,
                  pdfout = "rtcalibration.pdf",
                  im_column = 'IonMobilityIndexK0',
                  rt_alignment = 'nonlinear',
                  im_alignment = 'linear'):
     """Converts a mq output to a library taking a best replicate approach."""
-    if ion_mobility is not None:    
+    if ion_mobility is True:    
         ev = evidence.loc[:, ["id", "Calibrated retention time", "Ion mobility index", im_column]]
         ev = ev.rename(columns = {im_column:'imcol'})
         ev = ev.rename(columns = {'id':'Evidence ID'})
@@ -243,7 +243,7 @@ def pasef_to_tsv(evidence, msms,
     # Filter decoy peptides
     ms = ms[ms['Reverse'].isna()]
     
-    if ion_mobility is not None:
+    if ion_mobility is True:
     # Shape data for AssayGenerator
         msl = ms.loc[:, ["id","m/z","Masses","Charge","irt", "iim", "imcol", "Intensities","Sequence","ModifiedPeptideSequence","Proteins"]]
     else:
@@ -255,7 +255,7 @@ def pasef_to_tsv(evidence, msms,
     msl2 = msl.drop(['Masses', 'Intensities'], axis = 1)
     msl2 = msl2.join(df1).reset_index(drop = True)
 
-    if ion_mobility is not None:
+    if ion_mobility is True:
         msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","iRT", "Im_recalibrated", "PrecursorIonMobility", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
     else:
         msl2.columns = ["transition_group_id","PrecursorMz","PrecursorCharge","iRT", "PeptideSequence","FullUniModPeptideName","ProteinName", "ProductMz", "LibraryIntensity"]
