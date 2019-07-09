@@ -78,6 +78,7 @@ NormalizedRT = (rt - min(rt)) / (max(rt) - min(rt)) * 100
 
 ms['NormalizedRetentionTime'] = NormalizedRT
 
+# Filter by PEP (1%) and of these only take the top half of these ...
 ms = ms[ms['PEP'] < 0.01]
 ms = ms[ms['Score'] > ms['Score'].quantile(0.5)]
 ms = ms[ms['Peak coverage'] > ms['Peak coverage'].quantile(0.2)]
