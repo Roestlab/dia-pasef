@@ -34,12 +34,25 @@ r = re.compile(".*msms.txt")
 
 msms_files = list(filter(r.findall, filenames))
 
-msms = []
-sequence = []
-for i in msms_files:
-    stat = pd.read_csv(i, sep = '\t')
-    msms.append(pd.read_csv(i, sep = '\t'))
-    sequence.append(stat['Modified sequence'].to_list())
+if len(msms_files) > 1:
+    msms = []
+    sequence = []
+    for i in msms_files:
+        stat = pd.read_csv(i, sep = '\t')
+        msms.append(pd.read_csv(i, sep = '\t'))
+        sequence.append(stat['Modified sequence'].to_list())
+
+elif len(msms_files) == 1: # check for runs in 1 MQ output
+    full_msms = pd.read_csv(msms_files[0], sep = "\t")
+    raw_files = full_msms['Raw file'].unique()
+    if len(raw_files) > 1: 
+        msms = []
+        sequence = []
+        for k, v in full_msms.groupby('Raw file'):
+            df = v
+            msms.append(v)
+            sequence.append(v['Modified sequence'])
+            #print(sequence[0:10])
 
 # get the intersection peptides
 
@@ -69,7 +82,7 @@ elif 'IonMobilityIndexK0' in ev.columns:
     ev = ev.rename(columns = {'id':'Evidence ID', 'IonMobilityK0':'PrecursorIonMobility'})
 else:
     ev = ev.loc[:, ["id", "Calibrated retention time"]]
-        ev = ev.rename(columns = {'id': 'Evidence ID'})
+    ev = ev.rename(columns = {'id': 'Evidence ID'})
 
 ms = pd.merge(msms_irt, ev, on = 'Evidence ID')
 
@@ -85,8 +98,12 @@ ms = ms[ms['PEP'] < 0.01]
 ms = ms[ms['PEP'] < ms['Score'].quantile(0.5)]
 
 # Then take the number of peptide cutoff as specified
-if cutoff is not None:
+if cutoff is not -1:
+    print('Number of peptides: %d' %cutoff)
     ms = ms[0: cutoff]
+else:
+    print('No cutoff specified, number of peptides: %d' % len(intersection_peptides))
+
 
 ms1 = ms.loc[:, ["id", "m/z", "Masses", "Charge", "NormalizedRetentionTime","PrecursorIonMobility", "Intensities", "Sequence", "ModifiedPeptideSequence","Proteins"]]
 
