@@ -170,7 +170,15 @@ def pasef_to_tsv(evidence, msms,
                 sys.exit()
            # Prepare iRT table
             if irt.shape[1] > 2:
-                irt = irt.loc[:, ["ModifiedPeptideSequence", "NormalizedRetentionTime", "PrecursorIonMobility","PrecursorCharge"]]
+                irt_colnames = irt.columns.values.tolist()
+                # allowing different formats for reading iRTs
+                irt_mod = ['ModifiedPeptideSequence','Modified sequence', 'FullUniModPeptideName', 'FullPeptideName']
+                irt_mod = [name for name in irt_colnames if name in irt_mod]
+                irt_mod = irt_mod[0]
+                irt_rt = ['NormalizedRetentionTime', 'iRT', 'RetentionTime', 'Tr_recalibrated']
+                irt_rt = [name for name in irt_colnames if name in irt_rt]
+                irt_rt = irt_rt[0]
+                irt = irt.loc[:, [irt_mod, irt_rt, "PrecursorIonMobility","PrecursorCharge"]]
                 irt = irt.drop_duplicates()
             irt.columns = ["sequence","irt", "iim", "charge"]
             irt = reformat_mods(irt, 'sequence')
@@ -217,7 +225,15 @@ def pasef_to_tsv(evidence, msms,
                 sys.exit()
            # Prepare iRT table
             if irt.shape[1] > 2:
-                irt = irt.loc[:, ["ModifiedPeptideSequence", "NormalizedRetentionTime","PrecursorCharge"]]
+                irt_colnames = irt.columns.values.tolist()
+                # allowing different formats for reading iRTs
+                irt_mod = ['ModifiedPeptideSequence','Modified sequence', 'FullUniModPeptideName', 'FullPeptideName']
+                irt_mod = [name for name in irt_colnames if name in irt_mod]
+                irt_mod = irt_mod[0]
+                irt_rt = ['NormalizedRetentionTime', 'iRT', 'RetentionTime', 'Tr_recalibrated']
+                irt_rt = [name for name in irt_colnames if name in irt_rt]
+                irt_rt = irt_rt[0]
+                irt = irt.loc[:, [irt_mod, irt_rt, "PrecursorCharge"]]
                 irt = irt.drop_duplicates()
             irt.columns = ["sequence","irt", "charge"]
             irt = reformat_mods(irt, 'sequence')
