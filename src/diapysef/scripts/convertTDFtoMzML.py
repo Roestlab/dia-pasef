@@ -32,7 +32,7 @@ except OSError as e:
     print("This functionality can only be carried out if the bruker sdk is present. Please install it first. The sdk can be installed by installing proteowizard(version >=3, http://proteowizard.sourceforge.net), or by placing the a library file in your path (For windows this will be timsdata.dll and for Linux libtimsdata.so).\n")
     sys.exit()
 
-def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
+def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep_frames=False):
     """
     Store a single frame as an individual mzML file
 
@@ -94,7 +94,9 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         mslevel = 2
 
     if verbose:
-        print("mslevel", mslevel, msms)
+        print("Frame", frame_id, "mslevel", mslevel, msms, "contains nr scans:", num_scans)
+    if keep_frames:
+        next_scan_switch = -1
 
     # Get the mapping of the ion mobility axis
     scan_number_axis = np.arange(num_scans, dtype=np.float64)
@@ -158,6 +160,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True):
         s.setPrecursors([p])
         exp.consumeSpectrum(s)
 
+    # Store data compressed for cases where the whole frame represents a single spectrum (e.g. MS1)
     if compressFrame and next_scan_switch == -1:
         sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
         sframe.setNativeID("frame=%s" % frame_id)
@@ -228,6 +231,16 @@ def main():
                         type = int,
                         default = -1,
                         dest = "merge_scans")
+    parser.add_argument("--keep_frames",
+                        help = "Whether to keep frames intact or not (by default frames are split by precursor isolation window)",
+                        type = bool,
+                        default = False,
+                        dest = "keep_frames")
+    parser.add_argument("--verbose",
+                        help = "Verbosity",
+                        type = int,
+                        default = -1,
+                        dest = "verbosity")
     parser.add_argument("--overlap",
                         help = "How many overlapping windows were recorded for the same m/z window",
                         type = int,
@@ -315,7 +328,7 @@ def main():
         raise ValueError("Upper Frame limit is not in the permitted range of frames")
 
     for frame_id in range(lower_frame, upper_frame):
-        store_frame(frame_id+1, td, conn, consumer, compressFrame=True, verbose=False)
+        store_frame(frame_id+1, td, conn, consumer, compressFrame=True, verbose=args.verbosity > 1, keep_frames=args.keep_frames)
     
     print("Conversion completed, press Enter to continue.")
 
