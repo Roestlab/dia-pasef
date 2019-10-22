@@ -116,6 +116,10 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
             allmz.append(mz)
             allint.append(intens)
             allim.append( [drift_time for dr_time in mz] )
+            if len(mz) == 0 :
+                allmz.append([0])
+                allint.append([0])
+                allim.append( [drift_time for dr_time in [0] ] )
 
             # We have multiple MS2 spectra in each frame, we need to separate
             # them based on the information from PasefFrameMsMsInfo which
@@ -167,6 +171,14 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         exp.consumeSpectrum(sframe)
 
 def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width):
+    """
+    Store a full frame with N scans as a single MSSpectrum
+
+    One spectrum per frame is stored. This puts all peaks into a single
+    spectrum (while storing the IM data in an extra array).  This is more
+    efficient for storage and allows analysis that is ignorant of the IM
+    dimension.
+    """
     mz = np.concatenate(allmz)
     intens = np.concatenate(allint)
     ims = np.concatenate(allim)
