@@ -64,6 +64,9 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
     scan_data = []
     scan_data_it = 0
 
+    in_scan = False
+    scandata = None
+
     # Check whether we have a MS2 or a PASEF scan
     if msms == 2:
         q = conn.execute("SELECT TriggerMass, IsolationWidth, PrecursorCharge, CollisionEnergy FROM FrameMsMsInfo WHERE Frame={0}".format(frame_id))
@@ -73,28 +76,32 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         mslevel = 2
     # new tdf 5.1 has pasef scan msms = 9 
     elif msms == 9:
-        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy, Frame FROM DiaFrameMsMsWindows INNER JOIN DiaFrameMsMsInfo ON DiaFrameMsMsWindows.WindowGroup = DiaFrameMsMsInfo.WindowGroup WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
+        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy, Frame FROM DiaFrameMsMsWindows INNER JOIN DiaFrameMsMsInfo ON DiaFrameMsMsWindows.WindowGroup = DiaFrameMsMsInfo.WindowGroup WHERE Frame={0} ORDER BY  ScanNumBegin DESC".format(frame_id))
         scandata = q.fetchall()
         tmp = scandata[scan_data_it]
         center = float(tmp[0])
         width = float(tmp[1])
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
-        next_scan_switch = scan_start
+        next_scan_switch = scan_end
         mslevel = 2
     elif msms == 8:
-        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy FROM PasefFrameMsMsInfo WHERE Frame={0} ORDER BY IsolationMz ASC".format(frame_id))
+        q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy FROM PasefFrameMsMsInfo WHERE Frame={0} ORDER BY ScanNumBegin DESC".format(frame_id))
         scandata = q.fetchall()
         tmp = scandata[scan_data_it]
         center = float(tmp[0])
         width = float(tmp[1])
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
-        next_scan_switch = scan_start
+        next_scan_switch = scan_end
         mslevel = 2
+    else:
+        # MS1 
+        pass
 
     if verbose:
-        print("Frame", frame_id, "mslevel", mslevel, msms, "contains nr scans:", num_scans)
+        print("Frame", frame_id, "mslevel", mslevel, msms, "contains nr scans:", num_scans, "and nr pasef scans", len(scandata) if scandata else -1)
+        print("Scandata for PASEF:", scandata)
     if keep_frames:
         next_scan_switch = -1
 
@@ -102,11 +109,12 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
     scan_number_axis = np.arange(num_scans, dtype=np.float64)
     ook0_axis = td.scanNumToOneOverK0(frame_id, scan_number_axis)
 
+    nr_scans_created = 0
     allmz = []
     allint = []
     allim = []
 
-    # Traverse in reversed order to get low ion mobilities first
+    # Traverse in reversed order to get low ion mobilities first (and high scan times first)
     for k, scan in reversed(list(enumerate(td.readScans(frame_id, 0, num_scans)))):
         index = np.array(scan[0], dtype=np.float64)
         mz = td.indexToMz(frame_id, index)
@@ -121,26 +129,47 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
             # them based on the information from PasefFrameMsMsInfo which
             # indicates the switch scan and the isolation parameter for each
             # quadrupole isolation.
-            if next_scan_switch != -1 and next_scan_switch == k:
+            if next_scan_switch >= 0 and next_scan_switch >= k:
 
                 if verbose:
-                    print("Switch to new scan at", k, "with mapping", scandata)
+                    print("Switch to new scan at", k, " / ", next_scan_switch, "store scan of size", len(allmz))
 
-                sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
-                sframe.setNativeID("frame=%s_scan=%s" % (frame_id, next_scan_switch) )
-                exp.consumeSpectrum(sframe)
+                if in_scan:
+                    # Only store spectrum when actually inside a scan, skip the "between scan" pushes
+                    sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
+                    sframe.setNativeID("frame=%s_scan=%s" % (frame_id, next_scan_switch) )
+                    exp.consumeSpectrum(sframe)
+                    nr_scans_created += 1
+
                 allmz = []
                 allint = []
                 allim = []
                 if k == 0: continue
 
-                scan_data_it += 1
-                tmp = scandata[scan_data_it]
-                center = float(tmp[0])
-                width = float(tmp[1])
-                scan_start = int(tmp[2])
-                scan_end = int(tmp[3])
-                next_scan_switch = scan_start
+                if in_scan:
+                    scan_data_it += 1
+
+                    if scan_data_it >= len(scandata):
+                        if verbose: print("LEFT the last scan, nothing else to do here")
+                        next_scan_switch = -2
+                        continue
+
+                    # Already prepare for next scan
+                    tmp = scandata[scan_data_it]
+                    center = float(tmp[0])
+                    width = float(tmp[1])
+                    scan_start = int(tmp[2])
+                    scan_end = int(tmp[3])
+
+                    in_scan = False
+                    next_scan_switch = scan_end
+
+                    if verbose: print("LEAVING scan now, next scan starts at:", next_scan_switch)
+                else:
+                    in_scan = True
+                    next_scan_switch = scan_start
+                    if verbose: print("STARTING new scan at", k, ":",  center - width/2.0, center + width/2.0, "scan will end at :", next_scan_switch)
+
             continue
 
         # Store data in OpenMS Spectrum file -> each TOF push is an individual
@@ -165,6 +194,11 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
         sframe.setNativeID("frame=%s" % frame_id)
         exp.consumeSpectrum(sframe)
+        nr_scans_created += 1
+
+    if scandata is not None and (nr_scans_created != len(scandata)):
+        print ("eerrrror")
+        raise Exception("Something went quite wrong here, we expected", len(scandata), "scans, but only created", nr_scans_created)
 
 def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width):
     mz = np.concatenate(allmz)
@@ -182,6 +216,7 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width)
     sframe.setRT(rtime)
     sframe.setFloatDataArrays([fda])
     p = pyopenms.Precursor()
+
     if mslevel == 2:
         p.setMZ(center)
         p.setIsolationWindowUpperOffset(width / 2.0)
@@ -189,6 +224,7 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width)
     sframe.setPrecursors([p])
     sframe.set_peaks( (mz, intens) )
     sframe.sortByPosition()
+
     return sframe
 
 
@@ -217,22 +253,22 @@ def get_consumer(output_fname):
 
 def main():
 
-    parser = argparse.ArgumentParser(description ="Conversion program to convert a Bruker TIMS file to a single mzML")
+    parser = argparse.ArgumentParser(description ="Conversion program to convert a Bruker raw data file from a timsTOF Pro instrument into a single mzML.")
     parser.add_argument("-a", "--analysis_dir",
                         help = "The location of the directory containing raw data (usually .d)",
                         dest = 'analysis_dir',
                         required = True)
     parser.add_argument("-o", "--output_name",
-                        help = "The name of the output file",
+                        help = "The name of the output file (mzML)",
                         dest = "output_fname",
                         required = True)
     parser.add_argument("-m", "--merge",
-                        help = "How many frames to sum up into one",
+                        help = "Number of consecutive frames to sum up (squash). This is useful to boost S/N if exactly repeated frames are measured.",
                         type = int,
                         default = -1,
                         dest = "merge_scans")
     parser.add_argument("--keep_frames",
-                        help = "Whether to keep frames intact or not (by default frames are split by precursor isolation window)",
+                        help = "Whether to store frames exactly as measured or split them into individual spectra by precursor isolation window (default is to split them - this is almost always what you want).",
                         type = bool,
                         default = False,
                         dest = "keep_frames")
@@ -242,12 +278,12 @@ def main():
                         default = -1,
                         dest = "verbosity")
     parser.add_argument("--overlap",
-                        help = "How many overlapping windows were recorded for the same m/z window",
+                        help = "How many overlapping windows were recorded for the same m/z window - will split the output into N output files.",
                         type = int,
                         default = -1,
                         dest = "overlap_scans")
     parser.add_argument("-r", "--framerange",
-                        help = "The minimum and maximum Frames to convert.",
+                        help = "The minimum and maximum Frames to convert. Useful to only convert a part of a file.",
                         type = int,
                         nargs = 2,
                         default = [-1, -1],
