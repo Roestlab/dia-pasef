@@ -216,7 +216,6 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         nr_scans_created += 1
 
     if scandata is not None and (nr_scans_created != len(scandata)):
-        print ("eerrrror")
         raise Exception("Something went quite wrong here, we expected", len(scandata), "scans, but only created", nr_scans_created)
 
 def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width):
