@@ -84,6 +84,12 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
         next_scan_switch = scan_end
+        # Check if we already are in the new scan (if there is no
+        # gap between scans, happens for diaPASEF):
+        if next_scan_switch == num_scans:
+            next_scan_switch = scan_start
+            in_scan = True
+
         mslevel = 2
     elif msms == 8:
         q = conn.execute("SELECT IsolationMz, IsolationWidth, ScanNumBegin, ScanNumEnd, CollisionEnergy FROM PasefFrameMsMsInfo WHERE Frame={0} ORDER BY ScanNumBegin DESC".format(frame_id))
@@ -94,6 +100,12 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
         next_scan_switch = scan_end
+        # Check if we already are in the new scan (if there is no
+        # gap between scans, happens for diaPASEF):
+        if next_scan_switch == num_scans:
+            next_scan_switch = scan_start
+            in_scan = True
+
         mslevel = 2
     else:
         # MS1 
@@ -132,7 +144,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
             if next_scan_switch >= 0 and next_scan_switch >= k:
 
                 if verbose:
-                    print("Switch to new scan at", k, " / ", next_scan_switch, "store scan of size", len(allmz))
+                    print("Switch to new scan at", k, "/", next_scan_switch, "store scan of size", len(allmz))
 
                 if in_scan:
                     # Only store spectrum when actually inside a scan, skip the "between scan" pushes
@@ -165,10 +177,17 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
                     next_scan_switch = scan_end
 
                     if verbose: print("LEAVING scan now, next scan starts at:", next_scan_switch)
+
+                    # Check if we already are in the new scan (if there is no
+                    # gap between scans, happens for diaPASEF):
+                    if k == next_scan_switch:
+                        if verbose: print("STARTING new scan immediately at", k, ":",  center - width/2.0, center + width/2.0, "scan will end at:", next_scan_switch)
+                        next_scan_switch = scan_start
+                        in_scan = True
                 else:
                     in_scan = True
                     next_scan_switch = scan_start
-                    if verbose: print("STARTING new scan at", k, ":",  center - width/2.0, center + width/2.0, "scan will end at :", next_scan_switch)
+                    if verbose: print("STARTING new scan at", k, ":",  center - width/2.0, center + width/2.0, "scan will end at:", next_scan_switch)
 
             continue
 
