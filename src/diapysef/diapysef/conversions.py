@@ -142,7 +142,7 @@ def reformat_mods(data, column):
     data[column] = data[column].str.replace("\\(UniMod:35\\)","Oxidation")
     data[column] = data[column].str.replace("\\(UniMod:21\\)","Phospho")
     data[column] = data[column].str.replace("\\(UniMod:259\\)", "\\.\\(heavy_channel:modification_lysine\\)")
-    data[column] = data[column].str.replace("\\(UniMod:267\\)", "\\.\\(heavy_channel:modification_arginine\\)"))
+    data[column] = data[column].str.replace("\\(UniMod:267\\)", "\\.\\(heavy_channel:modification_arginine\\)")
     return(data)
 
 def pasef_to_tsv(evidence, msms,
