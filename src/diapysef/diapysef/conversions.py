@@ -133,16 +133,16 @@ def reformat_mods(data, column):
     data[column] = data[column].str.replace("(ph)","Phospho")
     data[column] = data[column].str.replace("C","C(Carbamidomethyl)")
     data[column] = data[column].str.replace("(ac)","Acetylation")
-    data[column] = data[column].str.replace("_\\(ly\\)", "\\.\\(heavy_channel:modification_lysine\\)")
-    data[column] = data[column].str.replace("_\\(ar)\\)", "\\.\\(heavy_channel:modification_arginine\\)")
+    data[column] = data[column].str.replace("_\\(ly\\)", ".(heavy_channel:modification_lysine)")
+    data[column] = data[column].str.replace("_\\(ar\\)", ".(heavy_channel:modification_arginine)")
     data[column] = data[column].str.replace("_", "")
 
     data[column] = data[column].str.replace("\\(UniMod:4\\)","(Carbamidomethyl)")
     data[column] = data[column].str.replace("\\(UniMod:1\\)","Acetylation")
     data[column] = data[column].str.replace("\\(UniMod:35\\)","Oxidation")
     data[column] = data[column].str.replace("\\(UniMod:21\\)","Phospho")
-    data[column] = data[column].str.replace("\\(UniMod:259\\)", "\\.\\(heavy_channel:modification_lysine\\)")
-    data[column] = data[column].str.replace("\\(UniMod:267\\)", "\\.\\(heavy_channel:modification_arginine\\)")
+    data[column] = data[column].str.replace("\\(UniMod:259\\)", ".(heavy_channel:modification_lysine)")
+    data[column] = data[column].str.replace("\\(UniMod:267\\)", ".(heavy_channel:modification_arginine)")
     return(data)
 
 def pasef_to_tsv(evidence, msms,
