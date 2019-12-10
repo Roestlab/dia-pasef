@@ -63,6 +63,7 @@ def align_rt(msms_irt, ms, runs, rt_alignment, pdfout, remove_outliers = True):
     elif rt_alignment is 'nonlinear':
         print('Aligning retention time with lowess fitting ...')
         lowess = smnonlinear.nonparametric.lowess
+        pp = PdfPages(pdfout)
         for file in runs:
             msms_irt_sub = msms_irt[msms_irt.raw == file]
             msms_irt_sub = msms_irt_sub.loc[:,["rt","irt"]]
@@ -90,13 +91,14 @@ def align_rt(msms_irt, ms, runs, rt_alignment, pdfout, remove_outliers = True):
 
             idx = np.asarray(np.where((ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values > max_bound)))   
 
-            lnmod = calibrate(msms_irt_sub)
+            lnmod = calibrate(msms_irt_sub, pdf=pp)
             intercept = lnmod[1] # intercept
             slope = lnmod[2] # slope
             nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values[idx]) + intercept
             nrt = []
             for t in nRT: nrt.append(t)
             ms.loc[ms['Raw file'] == file, 'irt'] = list(map(str, nrt))
+        pp.close()
     else:
         print('Only rt_alignment: linear and lowess calibrations are currently impletmented.')
         ms['irt'] = ms['Calibrated retention time']
