@@ -57,7 +57,7 @@ def align_rt(msms_irt, ms, runs, rt_alignment, pdfout, remove_outliers = True):
         # Apply rt calibrators
         calibrators = pd.DataFrame(columns = ['Raw file', 'intercept', 'slope'], data = calibrators)
         ms = pd.merge(ms, calibrators, on = 'Raw file')
-        ms['irt'] = ms.intercept + ms.slope * ms['Calibrated retention time']
+        ms['irt'] = ms.intercept + ms.slope * ms['Retention time']
         ms = ms.drop(columns=['intercept', 'slope'])
         
     elif rt_alignment is 'nonlinear':
@@ -82,26 +82,26 @@ def align_rt(msms_irt, ms, runs, rt_alignment, pdfout, remove_outliers = True):
             lowess_y = list(zip(*r))[1]
             # create an interpolation function
             f = interp1d(lowess_x, lowess_y, bounds_error=False)
-            nRT = np.asarray(f(ms.loc[ms['Raw file'] == file ,'Calibrated retention time'].values))
+            nRT = np.asarray(f(ms.loc[ms['Raw file'] == file ,'Retention time'].values))
             
             # fit linear extrapolation for values outside of approximation
             # print(sum(np.isnan(nRT)))
             min_bound = min(lowess_x)
             max_bound = max(lowess_x)
 
-            idx = np.asarray(np.where((ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values > max_bound)))   
+            idx = np.asarray(np.where((ms.loc[ms['Raw file'] == file, 'Retention time'].values < min_bound) | (ms.loc[ms['Raw file'] == file, 'Retention time'].values > max_bound)))   
 
             lnmod = calibrate(msms_irt_sub, pdf=pp)
             intercept = lnmod[1] # intercept
             slope = lnmod[2] # slope
-            nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Calibrated retention time'].values[idx]) + intercept
+            nRT[idx] = slope * (ms.loc[ms['Raw file'] == file, 'Retention time'].values[idx]) + intercept
             nrt = []
             for t in nRT: nrt.append(t)
             ms.loc[ms['Raw file'] == file, 'irt'] = list(map(str, nrt))
         pp.close()
     else:
         print('Only rt_alignment: linear and lowess calibrations are currently impletmented.')
-        ms['irt'] = ms['Calibrated retention time']
+        ms['irt'] = ms['Retention time']
 
     return(ms)
 
@@ -138,7 +138,12 @@ def reformat_mods(data, column):
     data[column] = data[column].str.replace("_\\(ly\\)", "(Label:13C(6)15N(2))")
     data[column] = data[column].str.replace("_\\(ar\\)", "(Label:13C(6)15N(4))")
     data[column] = data[column].str.replace("_", "")
-
+    data[column] = data[column].str.replace("Oxidation \\(M\\)", "Oxidation")
+    data[column] = data[column].str.replace("Acetyl \\(Protein N-term\\)", "Acetylation")
+      
+    
+    #data[column] = data[column].str.replace("Oxidation \\(M\\)", "UniMod:35")
+    #data[column] = data[column].str.replace("Acetyl \\(Protein N-term\\)", "UniMod:1")
     data[column] = data[column].str.replace("\\(UniMod:4\\)","(Carbamidomethyl)")
     data[column] = data[column].str.replace("\\(UniMod:1\\)","Acetylation")
     data[column] = data[column].str.replace("\\(UniMod:35\\)","Oxidation")
@@ -160,7 +165,7 @@ def pasef_to_tsv(evidence, msms,
         ev = ev.rename(columns = {im_column:'imcol'})
         ev = ev.rename(columns = {'id':'Evidence ID'})
         ms = pd.merge(msms, ev, on = 'Evidence ID')
-        ms = ms.dropna(subset=["Calibrated retention time"]) # Some precursors in MQ are not annotated with a RT
+        ms = ms.dropna(subset=["Retention time"]) # Some precursors in MQ are not annotated with a RT
 
         # Replace MQ mods to OpenMS mods
         ms = reformat_mods(ms, "Modified sequence")
@@ -193,7 +198,7 @@ def pasef_to_tsv(evidence, msms,
             msms_irt = ms[ms["ModifiedPeptideSequence"].isin(irt["sequence"])]
             ## We chose the best id of each peptide (only one charge state for alignment)
             msms_irt = msms_irt.loc[msms_irt.groupby(["Raw file","ModifiedPeptideSequence"])['PEP'].idxmin()]
-            msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Calibrated retention time", "imcol", "Charge"]]
+            msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Retention time", "imcol", "Charge"]] # changed to use raw retention time
             msms_irt.columns = ["raw","sequence","rt","im", "charge"]
             msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
             raw_files = msms_irt.raw.unique()
@@ -201,21 +206,21 @@ def pasef_to_tsv(evidence, msms,
             if rt_alignment is not None:
                 ms = align_rt(msms_irt, ms, raw_files, rt_alignment, pdfout, remove_outliers = True)
             else:
-                ms['irt'] = ms['Calibrated retention time']
+                ms['irt'] = ms['Retention time']
 
             if im_alignment is not None:
                 ms = align_im(msms_irt, ms, raw_files, im_alignment)
             else:
                 ms['iim'] = ms['imcol']
         else:
-            ms['irt'] = ms['Calibrated retention time']
+            ms['irt'] = ms['Retention time']
             ms['iim'] = ms['imcol']
 
     else:
         ev = evidence.loc[:, ["id", "Calibrated retention time"]]
         ev = ev.rename(columns = {'id':'Evidence ID'})
         ms = pd.merge(msms, ev, on = 'Evidence ID')
-        ms = ms.dropna(subset=["Calibrated retention time"]) # Some precursors in MQ are not annotated with a RT
+        ms = ms.dropna(subset=["Retention time"]) # Some precursors in MQ are not annotated with a RT
 
         # Replace MQ mods to OpenMS mods
         ms = reformat_mods(ms, "Modified sequence")
@@ -248,7 +253,7 @@ def pasef_to_tsv(evidence, msms,
             msms_irt = ms[ms["ModifiedPeptideSequence"].isin(irt["sequence"])]
             ## We chose the best id of each peptide (only one charge state for alignment)
             msms_irt = msms_irt.loc[msms_irt.groupby(["Raw file","ModifiedPeptideSequence"])['PEP'].idxmin()]
-            msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Calibrated retention time", "Charge"]]
+            msms_irt = msms_irt.loc[:, ["Raw file","ModifiedPeptideSequence","Retention time", "Charge"]] # changed to raw retention time
             msms_irt.columns = ["raw","sequence","rt", "charge"]
             msms_irt = pd.merge(msms_irt, irt, on = ['sequence', 'charge'])
             raw_files = msms_irt.raw.unique()
@@ -256,9 +261,9 @@ def pasef_to_tsv(evidence, msms,
             if rt_alignment is not None:
                 ms = align_rt(msms_irt, ms, raw_files, rt_alignment, pdfout, remove_outliers = True)
             else:
-                ms['irt'] = ms['Calibrated retention time']
+                ms['irt'] = ms['Retention time']
         else:
-            ms['irt'] = ms['Calibrated retention time']
+            ms['irt'] = ms['Retention time']
 
     # Filter for best identification (lowest PEP)
     ms = ms.loc[ms.groupby(["ModifiedPeptideSequence", "Charge"])['PEP'].idxmin()]
