@@ -18,7 +18,6 @@ import diapysef.merge_consumer
 import diapysef.splitting_consumer
 import diapysef.util
 
-
 try:
     if sys.platform[:5] == "win32" or sys.platform[:5] == "win64":
         libname = "timsdata.dll"
@@ -286,6 +285,11 @@ def main():
                         type = int,
                         default = -1,
                         dest = "merge_scans")
+    parser.add_argument("--total_number_overlap_mass_scans",
+                        help = "The total number of scans to be merged in an overlapping mass setting (use togther with --merge)",
+                        type = int,
+                        default = -1,
+                        dest = "merge_scans_overlap_mass")
     parser.add_argument("--keep_frames",
                         help = "Whether to store frames exactly as measured or split them into individual spectra by precursor isolation window (default is to split them - this is almost always what you want).",
                         type = bool,
@@ -310,15 +314,17 @@ def main():
     args = parser.parse_args()
     print("Running conversion with these parameters:\n ")
     analysis_dir = args.analysis_dir
-    print("Raw file directory: ", analysis_dir)
+    print("Raw file directory:", analysis_dir)
     output_fname = args.output_fname
-    print("Output name: ", output_fname)
+    print("Output name:", output_fname)
     merge_scans = args.merge_scans
-    print("Scans to merge: ", merge_scans)
+    print("Scans to merge:", merge_scans)
+    merge_scans_overlap_mass = args.merge_scans_overlap_mass
+    print("Total number of scans expected:", merge_scans_overlap_mass)
     overlap_scans = args.overlap_scans
-    print("Overlapping scans: ", overlap_scans)
+    print("Overlapping scans:", overlap_scans)
     frame_limit = args.frame_limit
-    print("Frame limits: ", frame_limit)
+    print("Frame limits:", frame_limit)
 
     # if len(sys.argv) < 3:
     #     raise RuntimeError("need arguments: tdf_directory output.mzML")
@@ -348,7 +354,25 @@ def main():
     if merge_scans != -1:
         consumer = diapysef.merge_consumer.MergeConsumer(consumer, merge_scans)
 
-    if overlap_scans > 1:
+    if merge_scans_overlap_mass != -1 and merge_scans == -1:
+        raise Exception("When using merge scan with overlap mass, please also set the merge scan parameter")
+    if merge_scans_overlap_mass != -1 and merge_scans != -1:
+
+        # We only need N - k number of consumers (where k is the number scans
+        # we merge) since we only consume the first spectrum after we have
+        # reached k spectra in our pool.
+        consumers = []
+        for k in range(merge_scans_overlap_mass - merge_scans + 1):
+            outspl = output_fname.rsplit(".", 1)
+            outname = outspl[0] + "_" + str(k) + "." + outspl[1]
+            consumer = get_consumer(outname)
+            consumers.append(consumer)
+
+        consumer = diapysef.splitting_consumer.SimpleSplittingConsumer(consumers)
+        consumer = diapysef.merge_consumer.TenzerMergeConsumer(consumer, merge_scans, merge_scans_overlap_mass,
+                reference_spectrum=1)
+
+    elif overlap_scans > 1:
         
         # For overlapping scans, we need to create N different consumers (N files on disk) 
         # with different file names which will then contain the overlapped spectra 

@@ -4,7 +4,7 @@ import pyopenms
 import numpy as np
 
 
-class MergeConsumer():
+class MergeConsumer(object):
     """
         Merging consumer that merges MS2 spectra with the same precursor. The
         number of consecutive spectra to be merged is a user parameter.
@@ -15,10 +15,13 @@ class MergeConsumer():
         Does not implement chromatogram consuming.
     """
 
-    def __init__(self, consumer, merge_nr):
+    def __init__(self, consumer, merge_nr, check_precursor = True, reference_spectrum = 0):
         self._internal_consumer = consumer
         self._spectrum_storage = {}
         self._merge_nr = merge_nr
+
+        self._check_precursor = check_precursor
+        self._reference_spectrum = reference_spectrum
 
     def __del__(self):
         """
@@ -58,8 +61,12 @@ class MergeConsumer():
          - we check that merged spectra have equal precursor m/z and same float array
         """
 
-        merge_spec = pyopenms.MSSpectrum(tmp[0])
-        fda = tmp[0].getFloatDataArrays()[0]
+        ref_spec = self._reference_spectrum
+        if ref_spec >= len(tmp): 
+            ref_spec = 0
+        merge_spec = pyopenms.MSSpectrum(tmp[ref_spec])
+        fda = tmp[ref_spec].getFloatDataArrays()[0]
+        
         fda.clear()
         allmz = []
         allint = []
@@ -69,9 +76,10 @@ class MergeConsumer():
             allint.append(i)
 
             # Sanity checks, precursors of merged spectra and float arrays need to match
-            assert q.getPrecursors()[0].getMZ() - merge_spec.getPrecursors()[0].getMZ() < 1e-5
-            assert len(q.getFloatDataArrays()) == len(merge_spec.getFloatDataArrays())
-            assert q.getFloatDataArrays()[0].getName() == merge_spec.getFloatDataArrays()[0].getName()
+            if self._check_precursor:
+                assert q.getPrecursors()[0].getMZ() - merge_spec.getPrecursors()[0].getMZ() < 1e-5
+                assert len(q.getFloatDataArrays()) == len(merge_spec.getFloatDataArrays())
+                assert q.getFloatDataArrays()[0].getName() == merge_spec.getFloatDataArrays()[0].getName()
 
             # TODO this is not very efficient, fix in pyOpenMS!
             for d in q.getFloatDataArrays()[0]:
@@ -85,4 +93,52 @@ class MergeConsumer():
         merge_spec.setFloatDataArrays([fda])
         merge_spec.sortByPosition()
         return merge_spec
+
+class TenzerMergeConsumer(MergeConsumer):
+    """
+        Merging consumer that merges any set of N consecutive MS2 spectra. The
+        number of consecutive spectra to be merged is a user parameter.
+
+        This class merges m/z and intensity coordinates as well as the first
+        FloatDataArray.
+
+        Does not implement chromatogram consuming.
+    """
+
+    def __init__(self, consumer, merge_nr, total_scans, check_precursor = False, reference_spectrum = 0):
+        super(TenzerMergeConsumer, self).__init__(consumer, merge_nr, check_precursor, reference_spectrum)
+        self._cnt = 0
+        self._total_nr = total_scans
+
+    def consumeSpectrum(self, s):
+        """
+            consume individual spectra:
+                - write MS1 spectra directly to disk
+                - collect MS2 spectra and write afer merging n spectra together
+        """
+        if s.getMSLevel() == 1:
+            self._internal_consumer.consumeSpectrum(s)
+        else:
+
+            # Iterate through all internal storage lists to which we need to
+            # append the current spectrum
+            mz = int(s.getPrecursors()[0].getMZ())
+            for k in range(self._cnt - self._merge_nr + 1, self._cnt + 1, 1):
+                # Skip those lists that are at the edge
+                if k < 0: continue
+                if k > self._total_nr - self._merge_nr: continue
+
+                tmp = self._spectrum_storage.get(k, [])
+                tmp.append(s)
+
+                if len(tmp) >= self._merge_nr:
+                    merge_spec = self._mergeSpectra(tmp)
+                    self._internal_consumer.consumeSpectrum(merge_spec)
+                    mz = int(merge_spec.getPrecursors()[0].getMZ())
+                    tmp = []
+
+                self._spectrum_storage[k] = tmp
+
+            self._cnt += 1
+            self._cnt %= self._total_nr
 
