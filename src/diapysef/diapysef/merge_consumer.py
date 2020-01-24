@@ -109,6 +109,7 @@ class TenzerMergeConsumer(MergeConsumer):
         super(TenzerMergeConsumer, self).__init__(consumer, merge_nr, check_precursor, reference_spectrum)
         self._cnt = 0
         self._total_nr = total_scans
+        print ("Tenzer: merge nr", merge_nr, "total", total_scans)
 
     def consumeSpectrum(self, s):
         """
@@ -117,17 +118,20 @@ class TenzerMergeConsumer(MergeConsumer):
                 - collect MS2 spectra and write afer merging n spectra together
         """
         if s.getMSLevel() == 1:
+            print ("Consumer MS1 spectrum")
             self._internal_consumer.consumeSpectrum(s)
         else:
 
             # Iterate through all internal storage lists to which we need to
             # append the current spectrum
             mz = int(s.getPrecursors()[0].getMZ())
+            print ("Got spectrum", self._cnt, "with precursor", mz)
             for k in range(self._cnt - self._merge_nr + 1, self._cnt + 1, 1):
                 # Skip those lists that are at the edge
                 if k < 0: continue
                 if k > self._total_nr - self._merge_nr: continue
 
+                print ("  -- will append to ", k)
                 tmp = self._spectrum_storage.get(k, [])
                 tmp.append(s)
 
@@ -135,6 +139,7 @@ class TenzerMergeConsumer(MergeConsumer):
                     merge_spec = self._mergeSpectra(tmp)
                     self._internal_consumer.consumeSpectrum(merge_spec)
                     mz = int(merge_spec.getPrecursors()[0].getMZ())
+                    print ("  -- will merge and write out nr spectra:", len(tmp), "with prec", mz)
                     tmp = []
 
                 self._spectrum_storage[k] = tmp

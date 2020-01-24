@@ -33,6 +33,7 @@ class SimpleSplittingConsumer(object):
         else:
             c = self._internal_consumers[self._cnt]
             c.consumeSpectrum(s)
+            print(":::Will consumer spectrum with splitting consumer", self._cnt, "and nr splits", self._nr_splits)
 
             self._cnt = self._cnt + 1
             self._cnt %= self._nr_splits
