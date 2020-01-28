@@ -120,6 +120,12 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
     scan_number_axis = np.arange(num_scans, dtype=np.float64)
     ook0_axis = td.scanNumToOneOverK0(frame_id, scan_number_axis)
 
+    # This has been observed in the wild
+    if width < 0:
+        print ("WARNING: Invalid Value! Isolation width is less than zero:", width, "in frame", frame_id)
+        print ("Will set width to zero")
+        width = 0
+
     nr_scans_created = 0
     allmz = []
     allint = []
@@ -171,6 +177,12 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
                     width = float(tmp[1])
                     scan_start = int(tmp[2])
                     scan_end = int(tmp[3])
+
+                    # This has been observed in the wild
+                    if width < 0:
+                        print ("WARNING: Invalid Value! Isolation width is less than zero:", width, "in frame", frame_id)
+                        print ("Will set width to zero")
+                        width = 0
 
                     in_scan = False
                     next_scan_switch = scan_end
