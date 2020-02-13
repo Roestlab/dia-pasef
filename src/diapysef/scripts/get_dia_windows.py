@@ -17,5 +17,6 @@ outfile = sys.argv[2]
 
 dia = DiaPasefData(experiment)
 windows = dia.get_windows()
+windows = windows.loc[:, ~windows.columns.duplicated()]
 
 windows.to_csv(outfile)

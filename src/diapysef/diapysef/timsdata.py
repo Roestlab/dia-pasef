@@ -237,12 +237,12 @@ class DiaPasefData(TimsData):
         """Extracts the window scheme from the first cycle of a tims file"""
         #pasef_ms2_id = 8 # diaPASEF ms2 scans are denoted by 8 instead of 2
         if self.ms2_id == 8:
-            cycle_length = self.get_cycle_length(self.ms2_id)
-            wpf = self.get_windows_per_frame(self.ms2_id)
+            cycle_length = self.get_cycle_length()
+            wpf = self.get_windows_per_frame()
             q = self.conn.execute("SELECT * FROM Frames INNER JOIN PasefFrameMsMsInfo ON Frames.Id=PasefFrameMsMsInfo.Frame WHERE MsMsType={0} LIMIT {1}" .format(self.ms2_id, cycle_length*wpf))
         elif self.ms2_id == 9:
-            cycle_length = self.get_cycle_length(self.ms2_id)
-            wpf = self.get_windows_oer_frame(self.ms2_id)
+            cycle_length = self.get_cycle_length()
+            wpf = self.get_windows_per_frame()
             q = self.conn.execute("SELECT * FROM Frames INNER JOIN DiaFrameMsMsInfo ON Frames.Id = DiaFrameMsMsInfo.Frame INNER JOIN DiaFrameMsMsWindows ON DiaFrameMsMsInfo.WindowGroup = DiaFrameMsMSWindows.WindowGroup WHERE MsMsType={0} LIMIT {1}".format(self.ms2_id, cycle_length*wpf))
         frames = q.fetchall()
         colnames = [description[0] for description in q.description]
