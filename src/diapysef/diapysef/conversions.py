@@ -172,13 +172,16 @@ def pasef_to_tsv(evidence, msms,
             if irt.shape[1] > 2:
                 irt_colnames = irt.columns.values.tolist()
                 # allowing different formats for reading iRTs
-                irt_mod = ['ModifiedPeptideSequence','Modified sequence', 'FullUniModPeptideName', 'FullPeptideName']
+                irt_mod = ['ModifiedPeptideSequence','Modified sequence', 'FullUniModPeptideName', 'FullPeptideName', 'ModifiedSequence']
                 irt_mod = [name for name in irt_colnames if name in irt_mod]
                 irt_mod = irt_mod[0]
-                irt_rt = ['NormalizedRetentionTime', 'iRT', 'RetentionTime', 'Tr_recalibrated']
+                irt_rt = ['NormalizedRetentionTime', 'iRT', 'RetentionTime', 'Tr_recalibrated', 'RetentionTimeCalculatorScore']
                 irt_rt = [name for name in irt_colnames if name in irt_rt]
                 irt_rt = irt_rt[0]
-                irt = irt.loc[:, [irt_mod, irt_rt, "PrecursorIonMobility","PrecursorCharge"]]
+                irt_im = ['PrecursorIonMobility', 'Ion Mobility MS1']
+                irt_im = [name for name in irt_colnames if name in irt_im]
+                irt_im = irt_im[0]
+                irt = irt.loc[:, [irt_mod, irt_rt, irt_im,"PrecursorCharge"]]
                 irt = irt.drop_duplicates()
             irt.columns = ["sequence","irt", "iim", "charge"]
             irt = reformat_mods(irt, 'sequence')
