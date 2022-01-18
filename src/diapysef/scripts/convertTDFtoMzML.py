@@ -63,6 +63,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
     mslevel = 1
     scan_data = []
     scan_data_it = 0
+    scanBoundariesk0 = (0.0, 0.0)
 
     in_scan = False
     scandata = None
@@ -84,6 +85,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
         next_scan_switch = scan_end
+        scanBoundariesk0 = td.scanNumberToOneOverK0(frame_id, np.array([scan_end, scan_start]) #spectrum 1/k0 boundaries for the first swath in the frame
         # Check if we already are in the new scan (if there is no
         # gap between scans, happens for diaPASEF):
         if next_scan_switch == num_scans:
@@ -100,6 +102,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
         next_scan_switch = scan_end
+        scanBoundariesk0 = td.scanNumberToOneOverK0(frame_id, np.array([scan_end, scan_start])
         # Check if we already are in the new scan (if there is no
         # gap between scans, happens for diaPASEF):
         if next_scan_switch == num_scans:
@@ -109,7 +112,11 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         mslevel = 2
     else:
         # MS1 
-        pass
+        q = conn.execute("select scanNumBegin, scanNumEnd from Frame where Id={0}".format(frame_id))
+        tmp = q.fetchone()
+        scan_start = int(tmp[0])
+        scan_end = int(tmp[1])
+        scanBoundariesk0 = td.scanNumberToOneOverK0(frame_id, np.array([scan_end, scan_start]) #1/k0 boundaries for ms1 spectrum 
 
     if verbose:
         print("Frame", frame_id, "mslevel", mslevel, msms, "contains nr scans:", num_scans, "and nr pasef scans", len(scandata) if scandata else -1)
@@ -148,7 +155,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
 
                 if in_scan:
                     # Only store spectrum when actually inside a scan, skip the "between scan" pushes
-                    sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
+                    sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width, scanBoundariesk0)
                     sframe.setNativeID("frame=%s_scan=%s" % (frame_id, next_scan_switch) )
                     exp.consumeSpectrum(sframe)
                     nr_scans_created += 1
@@ -172,6 +179,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
                     width = float(tmp[1])
                     scan_start = int(tmp[2])
                     scan_end = int(tmp[3])
+                    scanBoundariesk0 = td.scanNumToOneOverK0(frame_id, np.array([scan_end, scan_start]))
 
                     in_scan = False
                     next_scan_switch = scan_end
@@ -210,7 +218,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
 
     # Store data compressed for cases where the whole frame represents a single spectrum (e.g. MS1)
     if compressFrame and next_scan_switch == -1:
-        sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width)
+        sframe = handle_compressed_frame(allmz, allint, allim, mslevel, time, center, width, scanBoundariesk0)
         sframe.setNativeID("frame=%s" % frame_id)
         exp.consumeSpectrum(sframe)
         nr_scans_created += 1
@@ -218,7 +226,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
     if scandata is not None and (nr_scans_created != len(scandata)):
         raise Exception("Something went quite wrong here, we expected", len(scandata), "scans, but only created", nr_scans_created)
 
-def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width):
+def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width, scanBoundariesk0):
     mz = np.concatenate(allmz)
     intens = np.concatenate(allint)
     ims = np.concatenate(allim)
@@ -238,6 +246,11 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width)
         p.setMZ(center)
         p.setIsolationWindowUpperOffset(width / 2.0)
         p.setIsolationWindowLowerOffset(width / 2.0)
+
+    # set IM boundaries of spectrum, set here to be consistsent with proteowizard
+    sframe.setMetaValue('ion mobility lower limit', scanBoundariesk0[0])
+    sframe.setMetaValue('ion mobility upper limit', scanBoundariesk0[1])
+
     sframe.setPrecursors([p])
     sframe.set_peaks( (mz, intens) )
     sframe.sortByPosition()
