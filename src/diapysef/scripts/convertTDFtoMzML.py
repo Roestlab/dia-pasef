@@ -232,7 +232,6 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width)
     sframe = pyopenms.MSSpectrum()
     sframe.setMSLevel(mslevel)
     sframe.setRT(rtime)
-    sframe.setFloatDataArrays([fda])
     p = pyopenms.Precursor()
 
     if mslevel == 2:
@@ -242,6 +241,7 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width)
     sframe.setPrecursors([p])
     sframe.set_peaks( (mz, intens) )
     sframe.sortByPosition()
+    sframe.setFloatDataArrays([fda])
 
     return sframe
 
