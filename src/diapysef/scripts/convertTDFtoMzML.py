@@ -85,7 +85,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
         next_scan_switch = scan_end
-        scanBoundariesk0 = td.scanNumberToOneOverK0(frame_id, np.array([scan_end, scan_start]) #spectrum 1/k0 boundaries for the first swath in the frame
+        scanBoundariesk0 = td.scanNumToOneOverK0(frame_id, np.array([scan_end, scan_start])) #spectrum 1/k0 boundaries for the first swath in the frame
         # Check if we already are in the new scan (if there is no
         # gap between scans, happens for diaPASEF):
         if next_scan_switch == num_scans:
@@ -102,7 +102,7 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         scan_start = int(tmp[2])
         scan_end = int(tmp[3])
         next_scan_switch = scan_end
-        scanBoundariesk0 = td.scanNumberToOneOverK0(frame_id, np.array([scan_end, scan_start])
+        scanBoundariesk0 = td.scanNumToOneOverK0(frame_id, np.array([scan_end, scan_start]))
         # Check if we already are in the new scan (if there is no
         # gap between scans, happens for diaPASEF):
         if next_scan_switch == num_scans:
@@ -112,11 +112,12 @@ def store_frame(frame_id, td, conn, exp, verbose=False, compressFrame=True, keep
         mslevel = 2
     else:
         # MS1 
-        q = conn.execute("select scanNumBegin, scanNumEnd from Frame where Id={0}".format(frame_id))
+        q = conn.execute("select NumScans from Frames where Id={0}".format(frame_id))
         tmp = q.fetchone()
-        scan_start = int(tmp[0])
-        scan_end = int(tmp[1])
-        scanBoundariesk0 = td.scanNumberToOneOverK0(frame_id, np.array([scan_end, scan_start]) #1/k0 boundaries for ms1 spectrum 
+        scan_start = 0
+        scan_end = int(tmp[0])
+        scanBoundariesk0 = td.scanNumToOneOverK0(frame_id, np.array([scan_end, scan_start])) #1/k0 boundaries for ms1 spectrum 
+        print(scanBoundariesk0[1])
 
     if verbose:
         print("Frame", frame_id, "mslevel", mslevel, msms, "contains nr scans:", num_scans, "and nr pasef scans", len(scandata) if scandata else -1)
