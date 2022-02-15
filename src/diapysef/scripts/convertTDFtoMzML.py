@@ -232,13 +232,6 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width,
     intens = np.concatenate(allint)
     ims = np.concatenate(allim)
 
-    fda = pyopenms.FloatDataArray()
-    fda.setName("Ion Mobility")
-    fda.resize(len(mz))
-    for k, val in enumerate(ims):
-        fda[k] = val
-
-
     sframe = pyopenms.MSSpectrum()
     sframe.setMSLevel(mslevel)
     sframe.setRT(rtime)
@@ -253,9 +246,27 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width,
     sframe.setMetaValue('ion mobility lower limit', scanBoundariesk0[0])
     sframe.setMetaValue('ion mobility upper limit', scanBoundariesk0[1])
 
+
+    ## sort the arrays by ascending m/z with numpy, ensure that the mapping between m/z intens and IM is maintained
+    mzInds = mz.argsort()
+    sorted_mz = mz[mzInds]
+    sorted_intens = intens[mzInds]
+    sorted_ims = ims[mzInds]
+
     sframe.setPrecursors([p])
-    sframe.set_peaks( (mz, intens) )
-    #sframe.sortByPosition() ### This line screws up the IM mapping
+
+    #store peaks
+    sframe.set_peaks( (sorted_mz, sorted_intens) )
+    #sframe.sortByPosition() ### This line screws up the IM mapping, however without this line do not have sorting so have to sort, will use np
+
+    # store ims data
+    sorted_ims.astype(np.float32, casting='unsafe')
+    fda = pyopenms.FloatDataArray()
+    fda.setName("Ion Mobility")
+    fda.resize(len(mz))
+    for k, val in enumerate(sorted_ims):
+        fda[k] = val
+
     sframe.setFloatDataArrays([fda])
 
     return sframe
