@@ -238,7 +238,6 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width,
     for k, val in enumerate(ims):
         fda[k] = val
 
-
     sframe = pyopenms.MSSpectrum()
     sframe.setMSLevel(mslevel)
     sframe.setRT(rtime)
@@ -255,7 +254,7 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width,
 
     sframe.setPrecursors([p])
     sframe.set_peaks( (mz, intens) )
-    #sframe.sortByPosition() ### This line screws up the IM mapping
+    sframe.sortByPosition()
     sframe.setFloatDataArrays([fda])
 
     return sframe
@@ -270,13 +269,11 @@ def get_consumer(output_fname):
         try:
             opt = consumer.getOptions()
             diapysef.util.setCompressionOptions(opt)
-
             consumer.setOptions(opt)
         except Exception as e:
             print(e)
             print("Your version of pyOpenMS does not support any compression, your files may get rather large")
             pass
-
 
     elif output_fname.lower().endswith("sqmass"):
         consumer = pyopenms.MSDataSqlConsumer(output_fname)
@@ -287,8 +284,6 @@ def get_consumer(output_fname):
     return consumer
 
 def main():
-
-    print("JOSH INJECTION!!!")
 
     parser = argparse.ArgumentParser(description ="Conversion program to convert a Bruker raw data file from a timsTOF Pro instrument into a single mzML.")
     parser.add_argument("-a", "--analysis_dir",
@@ -361,17 +356,12 @@ def main():
     N = row[0]
     print("Analysis has {0} frames.".format(N))
 
-
-    print('getting consumer ...')
-
     consumer = get_consumer(output_fname)
 
     if merge_scans != -1:
-        print("getting merge consumer")
         consumer = diapysef.merge_consumer.MergeConsumer(consumer, merge_scans)
 
     if overlap_scans > 1:
-        print('getting overlap consumer')
         
         # For overlapping scans, we need to create N different consumers (N files on disk) 
         # with different file names which will then contain the overlapped spectra 
