@@ -254,8 +254,8 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width,
 
     sframe.setPrecursors([p])
     sframe.set_peaks( (mz, intens) )
-    sframe.sortByPosition()
     sframe.setFloatDataArrays([fda])
+    sframe.sortByPosition()
 
     return sframe
 
