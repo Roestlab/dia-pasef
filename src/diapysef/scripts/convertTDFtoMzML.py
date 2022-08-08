@@ -241,6 +241,7 @@ def handle_compressed_frame(allmz, allint, allim, mslevel, rtime, center, width,
     sframe = pyopenms.MSSpectrum()
     sframe.setMSLevel(mslevel)
     sframe.setRT(rtime)
+
     p = pyopenms.Precursor()
 
     if mslevel == 2:
