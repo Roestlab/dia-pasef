@@ -87,7 +87,7 @@ def export( infile, outfile, mslevel, verbose, log_file ):
 @click.option('--use_only_detecting_transitions/--no-use_only_detecting_transitions', default=True, show_default=True, help='Only include product m/z of detecting transitions. i.e do not use identifying transitions.')
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
 @click.option('--log_file', default='mobidik_peptide_coordinate_generation.log', show_default=True, type=str, help='Log file to save console messages.')
-def generate_coordinates( infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose, log_file):
+def prepare_coordinates( infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose, log_file):
     '''
     Generate peptide coordinates for targeted extraction of DIA-PASEF data
     '''
