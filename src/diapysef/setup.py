@@ -22,9 +22,18 @@ setup(name='diapysef',
           'matplotlib',
           'statsmodels',
           'pyopenms',
-          'patsy'],
+          'patsy',
+          'tqdm',
+          'joblib',
+          'click',
+          'logging'],
       package_data={
           'diapysef': ['data/*']
+      },
+      entry_points={
+          'console_scripts': [
+              "diapysef=diapysef.main:cli",
+              ]
       },
       scripts=['scripts/get_dia_windows.py',
                'scripts/annotate_mq_ionmobility.py',
