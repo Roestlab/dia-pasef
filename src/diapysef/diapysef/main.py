@@ -6,6 +6,7 @@ import pickle as pkl
 from datetime import datetime
 
 from .targeted_data_extraction import setup_logger, TargeteddiaPASEFExperiment, generate_coordinates
+from .convert_tdf_to_mzml import convert_tdf_to_mzml
 
 # Main Command Line Interface
 @click.group(chain=True)
@@ -40,7 +41,7 @@ class PythonLiteralOption(click.Option):
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
 @click.option('--log_file', default='diapasef_data_extraction.log', show_default=True, type=str, help='Log file to save console messages.')
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads to parallelize filtering of spectrums across threads.')
-def extract_target( infile, target_coordinates, outfile, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads ):
+def targeted_extraction( infile, target_coordinates, outfile, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads ):
   '''
   Extract from the raw data given a set of target coordinates to extract for.
   '''
@@ -52,7 +53,7 @@ def extract_target( infile, target_coordinates, outfile, mz_tol, rt_window, im_w
     raise AssertionError(f"Wrong input type ({target_coordinates}) for target coordinates (--coords)! Has to be a pickle file, see --help for example.")
   
   exp = TargeteddiaPASEFExperiment(infile, peptides, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads)
-  click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO Loading data...")
+  click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
   exp.load_data()
   click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Reducing spectra using targeted coordinates...")
   exp.reduce_spectra("targed_data_extraction.mzML")
@@ -71,7 +72,7 @@ def export( infile, outfile, mslevel, verbose, log_file ):
     Export a reduced targeted mzML file to a tsv file
     '''
     exp = TargeteddiaPASEFExperiment(infile, None, None, None, None, mslevel, verbose, log_file, None)
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO Loading data...")
+    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
     exp.load_data(is_filtered=True)
     exp.save_filtered_tsv(mslevel, outfile)
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished exporting data!")
@@ -93,9 +94,27 @@ def prepare_coordinates( infile, outfile, run_id, target_peptides, m_score, use_
     '''
     # Initialise logger
     setup_logger(log_file, verbose)
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO Generating coordinates...")
+    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating coordinates...")
     generate_coordinates(infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose)
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished generating coordinates!")
+
+# Conversion program to convert a Bruker TIMS .d data file to mzML format
+@cli.command()
+@click.option('--in', 'analysis_dir', required=True, type=click.Path(exists=True), help='The location of the directory containing raw data (usually .d).')
+@click.option('--out', 'output_fname', required=True, type=str, help='The name of the output file (mzML).')
+@click.option('--merge', 'merge_scans', default=-1, show_default=True, type=int, help='Number of consecutive frames to sum up (squash). This is useful to boost S/N if exactly repeated frames are measured.')
+@click.option('--keep_frames/--no-keep_frames', 'keep_frames', default=False, show_default=True, help='Whether to store frames exactly as measured or split them into individual spectra by precursor isolation window (default is to split them - this is almost always what you want).')
+@click.option('--verbose', 'verbosity', default=-1, show_default=True, type=int, help='Verbosity.')
+@click.option('--overlap', 'overlap_scans', default=-1, show_default=True, type=int, help='How many overlapping windows were recorded for the same m/z window - will split the output into N output files.')
+@click.option('--framerange', 'frame_limit', default='[-1, -1]', show_default=True, cls=PythonLiteralOption, help='The minimum and maximum Frames to convert. Useful to only convert a part of a file.')
+def convertTDFtoMzML(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit):
+    '''
+    Conversion program to convert a Bruker TIMS .d data file to mzML format
+    '''
+    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Converting {analysis_dir}...")
+    convert_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit)
+    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished converting TDF data to mzML!")
+
 
 
 if __name__ == '__main__':
