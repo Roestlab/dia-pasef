@@ -81,10 +81,10 @@ def export( infile, outfile, mslevel, verbose, log_file ):
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='An OSW file post Pyprophet statiscal validation.')
 @click.option('--out', 'outfile', default=('diapasef_extracted_data.tsv'), show_default=True, type=str, help='Filename to save pickle of peptide coordinates.')
 @click.option('--run_id', default=None, show_default=True, type=int, help='Run id in OSW file corresponding to DIA-PASEF run. Required if your OSW file is a merged OSW file.')
-@click.option('--target_peptides', default=None, show_default=True, cls=PythonLiteralOption, help='list of peptides (ModifiedPeptideSequence) to generate coordinates for. i.e. ["T(UniMod:21)ELISVSEVHPSR", "TELIS(UniMod:21)VSEVHPSR"]')
+@click.option('--target_peptides', default=None, show_default=True, type=str, help='list of peptides (ModifiedPeptideSequence) to generate coordinates for. i.e. ["T(UniMod:21)ELISVSEVHPSR", "TELIS(UniMod:21)VSEVHPSR"]')
 @click.option('--m_score', default=0.05, show_default=True, type=float, help='QValue to filter for peptides below QValue, generate coordinates for these peptides.')
 @click.option('--use_transition_peptide_mapping/--no-use_transition_peptide_mapping', default=False, show_default=True, help='Use the TRANSITION_PEPTIDE_MAPPING when getting PRODUCT MZ, instead of joining on TRANSITION_PRECURSOR_MAPPING.')
-@click.option('--use_only_detecting_transitions/--no-use_only_detecting_transitions', default=False, show_default=True, help='Only include product m/z of detecting transitions. i.e do not use identifying transitions.')
+@click.option('--use_only_detecting_transitions/--no-use_only_detecting_transitions', default=True, show_default=True, help='Only include product m/z of detecting transitions. i.e do not use identifying transitions.')
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
 @click.option('--log_file', default='mobidik_peptide_coordinate_generation.log', show_default=True, type=str, help='Log file to save console messages.')
 def generate_coordinates( infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose, log_file):
