@@ -21,14 +21,15 @@ from .util import setCompressionOptions
 
 
 try:
-    if sys.platform[:5] == "win32" or sys.platform[:5] == "win64":
-        libname = "timsdata.dll"
-        dll = cdll.LoadLibrary(libname)
-    elif sys.platform[:5] == "linux":
-        libname = "libtimsdata.so"
-        dll = cdll.LoadLibrary(libname)
-    else:
-        raise Exception("Unsupported platform.")
+    if __name__ == "__main__":
+        if sys.platform[:5] == "win32" or sys.platform[:5] == "win64":
+            libname = "timsdata.dll"
+            dll = cdll.LoadLibrary(libname)
+        elif sys.platform[:5] == "linux":
+            libname = "libtimsdata.so"
+            dll = cdll.LoadLibrary(libname)
+        else:
+            raise Exception("Unsupported platform.")
 except OSError as e:
     print("This functionality can only be carried out if the bruker sdk is present. Please install it first. The sdk can be installed by installing proteowizard(version >=3, http://proteowizard.sourceforge.net), or by placing the a library file in your path (For windows this will be timsdata.dll and for Linux libtimsdata.so).\n")
     sys.exit()
@@ -284,7 +285,7 @@ def get_consumer(output_fname):
 
     return consumer
 
-def convert_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit):
+def convert_diapasef_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit):
     """
     Main method to perform conversion form bruker tdf data to mzML format
     """
@@ -406,7 +407,7 @@ def main():
     # analysis_dir = sys.argv[1]
     # output_fname = sys.argv[2]
     
-    convert_tdf_to_mzml(analysis_dir, output_fname, merge_scans, args.keep_frames, args.verbosity, overlap_scans, frame_limit)
+    convert_diapasef_tdf_to_mzml(analysis_dir, output_fname, merge_scans, args.keep_frames, args.verbosity, overlap_scans, frame_limit)
 
     print("Conversion completed, press Enter to continue.")
 

@@ -6,7 +6,7 @@ import pickle as pkl
 from datetime import datetime
 
 from .targeted_data_extraction import setup_logger, TargeteddiaPASEFExperiment, generate_coordinates
-from .convert_tdf_to_mzml import convert_tdf_to_mzml
+from .convert_tdf_to_mzml import convert_diapasef_tdf_to_mzml
 
 # Main Command Line Interface
 @click.group(chain=True)
@@ -112,7 +112,7 @@ def convertTDFtoMzML(analysis_dir, output_fname, merge_scans, keep_frames, verbo
     Conversion program to convert a Bruker TIMS .d data file to mzML format
     '''
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Converting {analysis_dir}...")
-    convert_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit)
+    convert_diapasef_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit)
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished converting TDF data to mzML!")
 
 
