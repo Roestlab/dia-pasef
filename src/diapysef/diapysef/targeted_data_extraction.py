@@ -3,19 +3,18 @@ import os
 
 # MS data modules
 import pyopenms as po
-from .util import setCompressionOptions
+from .util import setCompressionOptions, method_timer, code_block_timer, setup_logger, check_sqlite_table, type_cast_value
+
 
 # Logging and performance modules
-from functools import wraps
-import contextlib
 import traceback
-from time import time
 import logging
 from tqdm import tqdm
 
 # Modules for data
 import pandas as pd
 import numpy as np
+import itertools
 import sqlite3 as sql3
 import pickle as pkl
 from joblib import Parallel, delayed, wrap_non_picklable_objects
@@ -24,61 +23,6 @@ from joblib import Parallel, delayed, wrap_non_picklable_objects
 # logging.getLogger('matplotlib').setLevel(logging.WARNING)
 # import matplotlib.pyplot as plt
 # import matplotlib.colors as colors
-
-
-def method_timer(f):
-    @wraps(f)
-    def wrap(*args, **kw):
-        ts = time()
-        result = f(*args, **kw)
-        te = time()
-        logging.debug('method:%r args:[%r, %r] took: %2.4f sec' % (
-            f.__name__, args, kw, te-ts))
-        return result
-    return wrap
-
-
-@contextlib.contextmanager
-def code_block_timer(ident, log_type=logging.info):
-    tstart = time()
-    yield
-    elapsed = time() - tstart
-    log_type("{0}: Elapsed {1} ms".format(ident, elapsed))
-
-
-def setup_logger(log_file, verbose):
-    '''
-    Setup logger
-    '''
-    if verbose == 0:
-        use_verbosity = logging.INFO
-    else:
-        use_verbosity = logging.DEBUG
-
-    root = logging.getLogger(__name__)
-    root.setLevel(use_verbosity)
-    logging.basicConfig(level=use_verbosity, filename=log_file, filemode='w',
-                        format='[%(asctime)s] %(name)s - %(levelname)s - %(message)s')
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(use_verbosity)
-    root.addHandler(handler)
-
-
-def check_sqlite_table(con, table):
-    '''
-    Check if a table exists in an SQL database
-    '''
-    table_present = False
-    c = con.cursor()
-    c.execute(
-        'SELECT count(name) FROM sqlite_master WHERE type="table" AND name="%s"' % table)
-    if c.fetchone()[0] == 1:
-        table_present = True
-    else:
-        table_present = False
-    c.fetchall()
-
-    return (table_present)
 
 
 def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, m_score=0.05, use_transition_peptide_mapping=False, use_only_detecting_transitions=True, verbose=0):
@@ -131,6 +75,9 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
                     data = file.read().replace('\n', '')
                 target_peptides = [peptide.strip()
                                    for peptide in data.split(',')]
+            elif type(target_peptides) == str:
+                # If a string list is passed to CLI, then convert to literal python list of strings
+                target_peptides = type_cast_value(target_peptides)
 
             logging.info(
                 f"Generating coordinates for the following peptides: {target_peptides}")
@@ -141,6 +88,9 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
       PRECURSOR.PRECURSOR_MZ AS precursor_mz,
       PRECURSOR.CHARGE AS charge,
       TRANSITION.PRODUCT_MZ AS product_mz,
+      TRANSITION.CHARGE AS product_charge,
+      TRANSITION.ANNOTATION AS product_annotation,
+      TRANSITION.DETECTING AS product_detecting,
       FEATURE.EXP_RT AS rt_apex,
       FEATURE.LEFT_WIDTH AS left_width,
       FEATURE.RIGHT_WIDTH AS right_width,
@@ -184,6 +134,21 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
                 list).to_frame().reset_index()
             data = pd.merge(data.drop('product_mz', axis=1),
                             agg_product_mz_df, on=['group_id'])
+            # Group and aggregate product charge into a list
+            agg_product_charge_df = data.groupby(['group_id'])['product_charge'].apply(
+                list).to_frame().reset_index()
+            data = pd.merge(data.drop('product_charge', axis=1),
+                            agg_product_charge_df, on=['group_id'])
+            # Group and aggregate product annotation into a list
+            agg_product_annotation_df = data.groupby(['group_id'])['product_annotation'].apply(
+                list).to_frame().reset_index()
+            data = pd.merge(data.drop('product_annotation', axis=1),
+                            agg_product_annotation_df, on=['group_id'])
+            # Group and aggregate product detecting into a list
+            agg_product_detecting_df = data.groupby(['group_id'])['product_detecting'].apply(
+                list).to_frame().reset_index()
+            data = pd.merge(data.drop('product_detecting', axis=1),
+                            agg_product_detecting_df, on=['group_id'])
 
             # Aggegate left and right bounaries into a list
             data['rt_boundaries'] = data[[
@@ -201,7 +166,8 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
         con.close()
 
     if outfile is not None:
-        logging.info(f"Writing coordinates dictionary to pikle file {outfile}")
+        logging.info(
+            f"Writing coordinates dictionary to pickle file {outfile}")
         with open(outfile, "wb") as output_file:
             pkl.dump(peptide_coordinates_dict, file=output_file)
     else:
@@ -212,6 +178,7 @@ class data_io():
     """
     Class for data input and output operations
     """
+
     def __init__(self, mzml_file, mz_tol=20, rt_window=50, im_window=0.06, mslevel=[1], verbose=0, log_file='diapasef_data_extraction.log'):
 
         # Initialise logger
@@ -276,18 +243,20 @@ class data_io():
         if output_fname.lower().endswith("mzml"):
             consumer = po.PlainMSDataWritingConsumer(output_fname)
 
-            # Compress output
-            try:
-                opt = consumer.getOptions()
-                setCompressionOptions(opt)
-                consumer.setOptions(opt)
-            except Exception as e:
-                print(e)
-                print(
-                    "Your version of pyOpenMS does not support any compression, your files may get rather large")
-                pass
+            # TODO: I've commented out compression, because it seems to make the quality of data bas when uncompressing
+            # # Compress output
+            # try:
+            #     opt = consumer.getOptions()
+            #     setCompressionOptions(opt)
+            #     consumer.setOptions(opt)
+            # except Exception as e:
+            #     print(e)
+            #     print(
+            #         "Your version of pyOpenMS does not support any compression, your files may get rather large")
+            #     pass
 
         elif output_fname.lower().endswith("sqmass"):
+            # TODO: For some reason the Sql consumer doesn't work if output file is of type sqmass
             consumer = po.MSDataSqlConsumer(output_fname)
 
         else:
@@ -305,13 +274,15 @@ class data_io():
           ms_level: (list) list of ms level data to write out to file
         """
         results_df = pd.DataFrame()
-        for k in range(self.filtered.getNrSpectra()):
+        for k in tqdm(range(self.filtered.getNrSpectra())):
             spec = self.filtered.getSpectrum(k)
             if spec.getMSLevel() in ms_level:
                 mz, intensity = spec.get_peaks()
                 rt = np.full([mz.shape[0]], spec.getRT(), float)
-                str_im = spec.getStringDataArrays()[0]
-                im = np.array([float(s) for s in str_im]).astype(np.float32)
+                # str_im = spec.getStringDataArrays()[0]
+                # im = np.array([float(s) for s in str_im]).astype(np.float32)
+                im_tmp = spec.getFloatDataArrays()[0]
+                im = im_tmp.get_data()
                 add_df = pd.DataFrame({'native_id': spec.getNativeID(), 'ms_level': spec.getMSLevel(
                 ), 'peptide': spec.getMetaValue('peptide'), 'mz': mz, 'rt': rt, 'im': im, 'int': intensity})
                 results_df = pd.concat([results_df, add_df])
@@ -328,7 +299,7 @@ class data_io():
           out_file: (str) output file to write data to
         """
         results_df = pd.DataFrame()
-        for k in range(self.filtered.getNrSpectra()):
+        for k in tqdm(range(self.filtered.getNrSpectra())):
             spec = self.filtered.getSpectrum(k)
             if spec.getMSLevel() in ms_level:
                 mz, intensity = spec.get_peaks()
@@ -337,8 +308,10 @@ class data_io():
                         f"Spectrum native id {spec.getNativeID()} had no m/z or intensity array, skipping this spectrum")
                     continue
                 rt = np.full([mz.shape[0]], spec.getRT(), float)
-                str_im = spec.getStringDataArrays()[0]
-                im = np.array([float(s) for s in str_im]).astype(np.float32)
+                # str_im = spec.getStringDataArrays()[0]
+                # im = np.array([float(s) for s in str_im]).astype(np.float32)
+                im_tmp = spec.getFloatDataArrays()[0]
+                im = im_tmp.get_data()
                 precursor = spec.getPrecursors()[0]
                 if self.verbose == 10:
                     logging.debug(
@@ -384,6 +357,7 @@ class TargeteddiaPASEFExperiment(data_io):
     """
     Class for a targeted DIA-PASEF data extraction
     """
+
     def __init__(self, mzml_file, peptides, mz_tol=20, rt_window=50, im_window=0.06, mslevel=[1], verbose=0, log_file='diapasef_data_extraction.log', threads=1):
         """
         Initialize data_access
@@ -392,6 +366,14 @@ class TargeteddiaPASEFExperiment(data_io):
                          im_window, mslevel, verbose, log_file)
         self.peptides = peptides
         self.threads = threads
+
+    def set_product(self, mz):
+        '''
+        Create a product container and set the mz
+        '''
+        product = po.Product()
+        product.setMZ(mz)
+        return product
 
     def get_upper_lower_tol(self, target_mz):
         """
@@ -470,27 +452,29 @@ class TargeteddiaPASEFExperiment(data_io):
         Return:
           If self contains a consumer, filtered spectrum is written to disk, otherwise the filtered spectrum MSSpectrum object is retuned
         """
-
         spec = self.exp.getSpectrum(spec_indice)
         if spec.getRT() >= rt_start and spec.getRT() <= rt_end:
-            filtered_mz = []
-            filtered_int = []
-            filtered_im = []
-            for mz, i, im in zip(*spec.get_peaks(), spec.getFloatDataArrays()[0].get_data()):
-                if spec.getMSLevel() in mslevel and mz > target_precursor_mz_lower and mz < target_precursor_mz_upper and im >= im_start and im <= im_end:
-                    if verbose == 10:
-                        logging.debug(
-                            f"Adding MS1 spectrum {spec.getNativeID()}")
-                    filtered_mz.append(mz)
-                    filtered_int.append(i)
-                    filtered_im.append(im)
-                elif spec.getMSLevel() == 2 and 2 in mslevel and self.is_mz_in_product_mz_tol_window(mz, target_product_upper_lower_list) and im >= im_start and im <= im_end:
-                    if verbose == 10:
-                        logging.debug(
-                            f"Adding MS2 spectrum {spec.getNativeID()}")
-                    filtered_mz.append(mz)
-                    filtered_int.append(i)
-                    filtered_im.append(im)
+            # Get data arrays
+            mz_array = spec.get_peaks()[0]
+            int_array = spec.get_peaks()[1]
+            im_array = spec.getFloatDataArrays()[0]
+            im_array = im_array.get_data()
+            # TODO: Think about how to vectorize this for-loop. Done.
+            if spec.getMSLevel() == 1 and 1 in mslevel:
+                mz_match_bool = (mz_array > target_precursor_mz_lower) & (mz_array < target_precursor_mz_upper)
+                if verbose == 10 and any(mz_match_bool):
+                    logging.debug(
+                        f"Adding MS1 spectrum {spec.getNativeID()} filtered for {sum(mz_match_bool)} m/z spectra between {target_precursor_mz_lower} m/z and {target_precursor_mz_upper} m/z")
+            elif spec.getMSLevel() == 2 and 2 in mslevel:
+                mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(target_product_upper_lower_list, len(mz_array)) )))
+                if verbose == 10 and any(mz_match_bool):
+                    logging.debug(
+                        f"Adding MS2 spectrum {spec.getNativeID()} filtered for {sum(mz_match_bool)} m/z spectra between {target_product_upper_lower_list} m/z")
+            im_match_bool = (im_array > im_start) & (im_array < im_end)
+            extract_target_indices = np.where(mz_match_bool * im_match_bool)
+            filtered_mz = mz_array[extract_target_indices]
+            filtered_int = int_array[extract_target_indices]
+            filtered_im = im_array[extract_target_indices]
             # replace peak data with filtered peak data
             spec.set_peaks((filtered_mz, filtered_int))
             # repalce float data arrays with filtered ion mobility data
@@ -501,6 +485,7 @@ class TargeteddiaPASEFExperiment(data_io):
             # TODO: There currently is an issue when setting float data array. Getting Float Data Array does not match input
             spec.setFloatDataArrays([fda])
             # Temp solution: Add string data of filtered ion mobility data
+            # TODO: Remove temp solution, since it is no longer needed.
             sda = po.StringDataArray()
             sda.setName("String Ion Mobility")
             _ = [sda.push_back(str(im_val)) for im_val in filtered_im]
@@ -515,7 +500,12 @@ class TargeteddiaPASEFExperiment(data_io):
                 self.peptides[target_peptide_group]['precursor_mz'])
             spec.setPrecursors([precursor])
 
+            # Set Prodcut mz values
+            spec.setProducts([self.set_product(
+                mz, ) for mz in self.peptides[target_peptide_group]['product_mz']])
+
             # Write out filtered spectra to file if consumer present. This is more memory efficient
+            # TODO: Once paralization works, will need to think about how writing to consumer will be affected
             if self.consumer is not None:
                 self.consumer.consumeSpectrum(spec)
             else:
@@ -565,9 +555,10 @@ class TargeteddiaPASEFExperiment(data_io):
             filtered = po.MSExperiment()
         pbar = tqdm(self.peptides.keys())
         pbar_desc = "INFO: Processing"
-        for target_peptide_group in self.peptides.keys():
+        for target_peptide_group in pbar:
             # Update progess bar description
-            pbar_desc = pbar_desc + f"..\n{target_peptide_group}"
+            # pbar_desc = pbar_desc + f"..\n{target_peptide_group}"
+            pbar_desc = f"INFO: Processing..{target_peptide_group}"
             pbar.set_description(pbar_desc)
 
             # Get Coordinates for current peptide

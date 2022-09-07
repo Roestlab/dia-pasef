@@ -5,7 +5,8 @@ import sys
 import pickle as pkl
 from datetime import datetime
 
-from .targeted_data_extraction import setup_logger, TargeteddiaPASEFExperiment, generate_coordinates
+from .util import setup_logger
+from .targeted_data_extraction import TargeteddiaPASEFExperiment, generate_coordinates
 from .convert_tdf_to_mzml import convert_diapasef_tdf_to_mzml
 
 # Main Command Line Interface
@@ -33,7 +34,7 @@ class PythonLiteralOption(click.Option):
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Raw data, diaPASEF mzML file.')
 @click.option('--coords', 'target_coordinates', required=True, type=click.Path(exists=True), help="""File that contains target coordinates to extract data for, or a file that can be used to generate target coordinates from.\b\n\nCan be one of:\n\npickle (.pkl) - a pickle file that contains a python dictionary of coordinates, i.e. { "TELISVSEVHPS(UniMod:21)R" : {'precursor_mz':767.3691,'charge':2,'product_mz': [311.0639, 312.6357, 322.1867, ..., 11432.6832],'rt_apex':1736.98,'rt_boundaries':[1719.823, 1759.129],'im_apex':0.9884788}, "T(UniMod:21)ELISVSEVHPSR" : {'precursor_mz':767.3691, 'charge':2,'product_mz': [311.0639, 312.6357, 322.1867, ..., 11432.6832],'rt_apex':1730.08,'rt_boundaries':[1718.037, 1751.984],'im_apex':1.0261329}}""")
-@click.option('--out', 'outfile', default=('diapasef_extracted_data.tsv'), show_default=True, type=str, help='Filename to save extracted data to.')
+@click.option('--out', 'outfile', default=('targed_data_extraction.mzML'), show_default=True, type=str, help='Filename to save extracted data to. Must be type mzML')
 @click.option('--mz_tol', default=20, show_default=True, type=int, help='The m/z tolerance toget get upper and lower bounds arround target mz. Must be in ppm.')
 @click.option('--rt_window', default=50, show_default=True, type=int, help='The total window range of RT, i.e. a window of 50 would be 25 points to either side of the target RT.')
 @click.option('--im_window', default=0.06, show_default=True, type=float, help='The total window range of IM, i.e. a window of 0.06 would be 0.03 points to either side of the target IM.')
@@ -51,14 +52,23 @@ def targeted_extraction( infile, target_coordinates, outfile, mz_tol, rt_window,
     peptides = pkl.load(pickle_file)
   else:
     raise AssertionError(f"Wrong input type ({target_coordinates}) for target coordinates (--coords)! Has to be a pickle file, see --help for example.")
-  
+  # Debug
+  if False:
+      infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/data/raw/IPP_M10_DIA-PaSEF_60min_Bruker10_400nL_1ul-inj-redo2_Slot2-25_1_2151.mzML"
+      target_coordinates = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/dia-pasef/src/diapysef/peptides_coord_ex.pkl"
+      mz_tol = 20
+      rt_window = 40
+      im_window = 0.06
+      verbose = 1
+      log_file = "diapasef_data_extraction.log"
+      
   exp = TargeteddiaPASEFExperiment(infile, peptides, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads)
   click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
   exp.load_data()
   click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Reducing spectra using targeted coordinates...")
-  exp.reduce_spectra("targed_data_extraction.mzML")
+  exp.reduce_spectra(outfile)
   click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished extracting targeted spectra!")
-#   exp.save_filtered_tsv(outfile)
+
 
 # Export filtered mzML to tabular data for plotting
 @cli.command()
@@ -80,9 +90,9 @@ def export( infile, outfile, mslevel, verbose, log_file ):
 # Generate a pickle file containing a dictionary of peptide coordinates for targeted data extraction
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='An OSW file post Pyprophet statiscal validation.')
-@click.option('--out', 'outfile', default=('diapasef_extracted_data.tsv'), show_default=True, type=str, help='Filename to save pickle of peptide coordinates.')
+@click.option('--out', 'outfile', default=('peptides_coordinates.pkl'), show_default=True, type=str, help='Filename to save pickle of peptide coordinates.')
 @click.option('--run_id', default=None, show_default=True, type=int, help='Run id in OSW file corresponding to DIA-PASEF run. Required if your OSW file is a merged OSW file.')
-@click.option('--target_peptides', default=None, show_default=True, type=str, help='list of peptides (ModifiedPeptideSequence) to generate coordinates for. i.e. ["T(UniMod:21)ELISVSEVHPSR", "TELIS(UniMod:21)VSEVHPSR"]')
+@click.option('--target_peptides', default=None, show_default=True, type=str, help='list of peptides (ModifiedPeptideSequence) to generate coordinates for. i.e. ["T(UniMod:21)ELISVSEVHPSR", "TELIS(UniMod:21)VSEVHPSR"]. You can alternatively pass a text file containing comma separate peptide sequences.')
 @click.option('--m_score', default=0.05, show_default=True, type=float, help='QValue to filter for peptides below QValue, generate coordinates for these peptides.')
 @click.option('--use_transition_peptide_mapping/--no-use_transition_peptide_mapping', default=False, show_default=True, help='Use the TRANSITION_PEPTIDE_MAPPING when getting PRODUCT MZ, instead of joining on TRANSITION_PRECURSOR_MAPPING.')
 @click.option('--use_only_detecting_transitions/--no-use_only_detecting_transitions', default=True, show_default=True, help='Only include product m/z of detecting transitions. i.e do not use identifying transitions.')
@@ -114,7 +124,6 @@ def convertTDFtoMzML(analysis_dir, output_fname, merge_scans, keep_frames, verbo
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Converting {analysis_dir}...")
     convert_diapasef_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit)
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished converting TDF data to mzML!")
-
 
 
 
