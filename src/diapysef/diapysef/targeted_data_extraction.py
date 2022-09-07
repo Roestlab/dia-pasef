@@ -19,12 +19,6 @@ import sqlite3 as sql3
 import pickle as pkl
 from joblib import Parallel, delayed, wrap_non_picklable_objects
 
-# import seaborn as sns
-# logging.getLogger('matplotlib').setLevel(logging.WARNING)
-# import matplotlib.pyplot as plt
-# import matplotlib.colors as colors
-
-
 def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, m_score=0.05, use_transition_peptide_mapping=False, use_only_detecting_transitions=True, verbose=0):
     """
     Generate a dictionary of target coordinates to extract from Raw diaPASEF mzML data

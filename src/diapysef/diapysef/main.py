@@ -8,6 +8,7 @@ from datetime import datetime
 from .util import setup_logger
 from .targeted_data_extraction import TargeteddiaPASEFExperiment, generate_coordinates
 from .convert_tdf_to_mzml import convert_diapasef_tdf_to_mzml
+from .plotting import save_report_2d_rt_im_heatmap
 
 # Main Command Line Interface
 @click.group(chain=True)
@@ -125,6 +126,23 @@ def convertTDFtoMzML(analysis_dir, output_fname, merge_scans, keep_frames, verbo
     convert_diapasef_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit)
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished converting TDF data to mzML!")
 
+# Generate a report for spectic type of plots
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Data tsv file that contains data to be plotting. i.e peptide sequence, charge state, m/z, MS level, retention time, ion mobility, and intensity')
+@click.option('--out', 'outpdf', required=True, type=str, help='The pdf file name to save the plots to.')
+@click.option('--type', 'plot_type', default='rt_im_heatmap', show_default=True, type=click.Choice(['rt_im_heatmap']), help='Type of plot to generate.')
+# rt_im_heatmap
+@click.option('--plot_contours/--no-plot_contours', 'plot_contours', default=False, show_default=True, help='Should contour lines be plotted? Arg for type rt_im_heatmap')
+def report(infile, outpdf, plot_type, plot_contours):
+    '''
+    Generate a report for a specfific type of plot
+    '''
+    if plot_type=='rt_im_heatmap':
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating a report of plots for a Retention Time and Ion Mobility Heatmaps...")
+        save_report_2d_rt_im_heatmap(infile, outpdf, plot_contours)
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished generating report!")
+    else:
+        raise click.ClickException(f'plot type {plot_type} is not supported')
 
 
 
