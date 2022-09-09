@@ -9,6 +9,7 @@ from .util import setCompressionOptions, method_timer, code_block_timer, setup_l
 # Logging and performance modules
 import traceback
 import logging
+import click
 from tqdm import tqdm
 
 # Modules for data
@@ -59,7 +60,14 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
         elif check_sqlite_table(con, "SCORE_MS2"):
             # Restrict to top peak group rank to generate coordinates for. We also filter based on MS2 QVALUE to reduce the number of peptides to generate coordinates for
             join_on_score_table = "INNER JOIN (SELECT * FROM SCORE_MS2 WHERE RANK ==1 AND QVALUE < %s) AS SCORE_TABLE ON SCORE_TABLE.FEATURE_ID = FEATURE.ID" % (m_score)
-
+        
+        if run_id is None:
+            run_ids_df = pd.read_sql_query("SELECT * FROM RUN", con)
+            if run_ids_df.shape[0] > 1:
+                raise click.ClickException(f"ERROR: Your input osw file {file} contains more than one run id! Most likely a merged osw, you need to explicilty supply --run_id ID in this case!\n{run_ids_df.to_string()}")
+            else:
+                run_id = run_ids_df.ID[0]
+                
         if target_peptides is not None:
 
             if os.path.isfile(target_peptides):
