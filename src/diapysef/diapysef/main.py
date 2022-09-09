@@ -11,9 +11,11 @@ from .convert_tdf_to_mzml import convert_diapasef_tdf_to_mzml
 from .plotting import save_report_2d_rt_im_heatmap
 
 # Main Command Line Interface
+
+
 @click.group(chain=True)
 @click.version_option()
-def cli( ):
+def cli():
     '''
     Mobi-DIK (Ion Mobility DIA Tool-Kit) is a package for analysis of DIA data coupled to ion mobility. 
 
@@ -31,8 +33,10 @@ class PythonLiteralOption(click.Option):
             return ast.literal_eval(value)
         except Exception:
             raise click.BadParameter(value)
-    
+
 # Main Targeted DIA-PASEF Data Extraction
+
+
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Raw data, diaPASEF mzML file.')
 @click.option('--coords', 'target_coordinates', required=True, type=click.Path(exists=True), help="""File that contains target coordinates to extract data for, or a file that can be used to generate target coordinates from.\b\n\nCan be one of:\n\npickle (.pkl) - a pickle file that contains a python dictionary of coordinates, i.e. { "TELISVSEVHPS(UniMod:21)R" : {'precursor_mz':767.3691,'charge':2,'product_mz': [311.0639, 312.6357, 322.1867, ..., 11432.6832],'rt_apex':1736.98,'rt_boundaries':[1719.823, 1759.129],'im_apex':0.9884788}, "T(UniMod:21)ELISVSEVHPSR" : {'precursor_mz':767.3691, 'charge':2,'product_mz': [311.0639, 312.6357, 322.1867, ..., 11432.6832],'rt_apex':1730.08,'rt_boundaries':[1718.037, 1751.984],'im_apex':1.0261329}}""")
@@ -44,41 +48,46 @@ class PythonLiteralOption(click.Option):
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
 @click.option('--log_file', default='mobidik_data_extraction.log', show_default=True, type=str, help='Log file to save console messages.')
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads to parallelize filtering of spectrums across threads.')
-def targeted_extraction( infile, target_coordinates, outfile, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads ):
-  '''
-  Extract from the raw data given a set of target coordinates to extract for.
-  '''
+def targeted_extraction(infile, target_coordinates, outfile, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads):
+    '''
+    Extract from the raw data given a set of target coordinates to extract for.
+    '''
 
-  # Initialise logger
-  setup_logger(log_file, verbose)
+    # Initialise logger
+    setup_logger(log_file, verbose)
 
-  if verbose == 10:
+    if verbose == 10:
         args_dict = locals()
         argument_value_log(args_dict)
 
-  if target_coordinates.endswith('.pkl'):
-    pickle_file = open(target_coordinates, 'rb')
-    peptides = pkl.load(pickle_file)
-  else:
-    raise AssertionError(f"Wrong input type ({target_coordinates}) for target coordinates (--coords)! Has to be a pickle file, see --help for example.")
-  # Debug
-  if False:
-      infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/data/raw/IPP_M10_DIA-PaSEF_60min_Bruker10_400nL_1ul-inj-redo2_Slot2-25_1_2151.mzML"
-      target_coordinates = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/dia-pasef/src/diapysef/example/peptides_coord_ex.pkl"
-      mz_tol = 20
-      rt_window = 40
-      im_window = 0.06
-      verbose = 1
-      log_file = "diapasef_data_extraction.log"
-      mslevel=[1,2]
-      threads=1
-      
-  exp = TargeteddiaPASEFExperiment(infile, peptides, mz_tol, rt_window, im_window, mslevel, verbose, None, threads)
-  click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
-  exp.load_data()
-  click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Reducing spectra using targeted coordinates...")
-  exp.reduce_spectra(outfile)
-  click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished extracting targeted spectra!")
+    if target_coordinates.endswith('.pkl'):
+        pickle_file = open(target_coordinates, 'rb')
+        peptides = pkl.load(pickle_file)
+    else:
+        raise AssertionError(
+            f"Wrong input type ({target_coordinates}) for target coordinates (--coords)! Has to be a pickle file, see --help for example.")
+    # Debug
+    if False:
+        infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/data/raw/IPP_M10_DIA-PaSEF_60min_Bruker10_400nL_1ul-inj-redo2_Slot2-25_1_2151.mzML"
+        target_coordinates = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/dia-pasef/src/diapysef/example/peptides_coord_ex.pkl"
+        mz_tol = 20
+        rt_window = 40
+        im_window = 0.06
+        verbose = 1
+        log_file = "diapasef_data_extraction.log"
+        mslevel = [1, 2]
+        threads = 1
+
+    exp = TargeteddiaPASEFExperiment(
+        infile, peptides, mz_tol, rt_window, im_window, mslevel, verbose, None, threads)
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
+    exp.load_data()
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Reducing spectra using targeted coordinates...")
+    exp.reduce_spectra(outfile)
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished extracting targeted spectra!")
 
 
 # Export filtered mzML to tabular data for plotting
@@ -88,7 +97,7 @@ def targeted_extraction( infile, target_coordinates, outfile, mz_tol, rt_window,
 @click.option('--mslevel', default='[1]', show_default=True, cls=PythonLiteralOption, help='list of mslevel(s) to extract data for. i.e. [1,2] would extract data for MS1 and MS2.')
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
 @click.option('--log_file', default='mobidik_export.log', show_default=True, type=str, help='Log file to save console messages.')
-def export( infile, outfile, mslevel, verbose, log_file ):
+def export(infile, outfile, mslevel, verbose, log_file):
     '''
     Export a reduced targeted mzML file to a tsv file
     '''
@@ -99,13 +108,18 @@ def export( infile, outfile, mslevel, verbose, log_file ):
         args_dict = locals()
         argument_value_log(args_dict)
 
-    exp = TargeteddiaPASEFExperiment(infile, None, None, None, None, mslevel, verbose, None, None)
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
+    exp = TargeteddiaPASEFExperiment(
+        infile, None, None, None, None, mslevel, verbose, None, None)
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
     exp.load_data(is_filtered=True)
     exp.save_filtered_tsv(mslevel, outfile)
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished exporting data!")
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished exporting data!")
 
 # Generate a pickle file containing a dictionary of peptide coordinates for targeted data extraction
+
+
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='An OSW file post Pyprophet statiscal validation.')
 @click.option('--out', 'outfile', default=('peptides_coordinates.pkl'), show_default=True, type=str, help='Filename to save pickle of peptide coordinates.')
@@ -116,7 +130,7 @@ def export( infile, outfile, mslevel, verbose, log_file ):
 @click.option('--use_only_detecting_transitions/--no-use_only_detecting_transitions', default=True, show_default=True, help='Only include product m/z of detecting transitions. i.e do not use identifying transitions.')
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
 @click.option('--log_file', default='mobidik_peptide_coordinate_generation.log', show_default=True, type=str, help='Log file to save console messages.')
-def prepare_coordinates( infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose, log_file):
+def prepare_coordinates(infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose, log_file):
     '''
     Generate peptide coordinates for targeted extraction of DIA-PASEF data
     '''
@@ -127,11 +141,16 @@ def prepare_coordinates( infile, outfile, run_id, target_peptides, m_score, use_
         args_dict = locals()
         argument_value_log(args_dict)
 
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating coordinates...")
-    generate_coordinates(infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose)
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished generating coordinates!")
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating coordinates...")
+    generate_coordinates(infile, outfile, run_id, target_peptides, m_score,
+                         use_transition_peptide_mapping, use_only_detecting_transitions, verbose)
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished generating coordinates!")
 
 # Conversion program to convert a Bruker TIMS .d data file to mzML format
+
+
 @cli.command()
 @click.option('--in', 'analysis_dir', required=True, type=click.Path(exists=True), help='The location of the directory containing raw data (usually .d).')
 @click.option('--out', 'output_fname', required=True, type=str, help='The name of the output file (mzML).')
@@ -144,11 +163,16 @@ def convertTDFtoMzML(analysis_dir, output_fname, merge_scans, keep_frames, verbo
     '''
     Conversion program to convert a Bruker TIMS .d data file to mzML format
     '''
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Converting {analysis_dir}...")
-    convert_diapasef_tdf_to_mzml(analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit)
-    click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished converting TDF data to mzML!")
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Converting {analysis_dir}...")
+    convert_diapasef_tdf_to_mzml(
+        analysis_dir, output_fname, merge_scans, keep_frames, verbosity, overlap_scans, frame_limit)
+    click.echo(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished converting TDF data to mzML!")
 
 # Generate a report for spectic type of plots
+
+
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Data tsv file that contains data to be plotting. i.e peptide sequence, charge state, m/z, MS level, retention time, ion mobility, and intensity')
 @click.option('--out', 'outpdf', required=True, type=str, help='The pdf file name to save the plots to.')
@@ -166,13 +190,14 @@ def report(infile, outpdf, plot_type, plot_contours, verbose, log_file):
     if verbose == 10:
         args_dict = locals()
         argument_value_log(args_dict)
-    if plot_type=='rt_im_heatmap':
-        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating a report of plots for a Retention Time and Ion Mobility Heatmaps...")
+    if plot_type == 'rt_im_heatmap':
+        click.echo(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating a report of plots for a Retention Time and Ion Mobility Heatmaps...")
         save_report_2d_rt_im_heatmap(infile, outpdf, plot_contours)
-        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished generating report!")
+        click.echo(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished generating report!")
     else:
         raise click.ClickException(f'plot type {plot_type} is not supported')
-
 
 
 if __name__ == '__main__':

@@ -20,6 +20,7 @@ import sqlite3 as sql3
 import pickle as pkl
 from joblib import Parallel, delayed, wrap_non_picklable_objects
 
+
 def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, m_score=0.05, use_transition_peptide_mapping=False, use_only_detecting_transitions=True, verbose=0):
     """
     Generate a dictionary of target coordinates to extract from Raw diaPASEF mzML data
@@ -60,14 +61,21 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
         elif check_sqlite_table(con, "SCORE_MS2"):
             # Restrict to top peak group rank to generate coordinates for. We also filter based on MS2 QVALUE to reduce the number of peptides to generate coordinates for
             join_on_score_table = "INNER JOIN (SELECT * FROM SCORE_MS2 WHERE RANK ==1 AND QVALUE < %s) AS SCORE_TABLE ON SCORE_TABLE.FEATURE_ID = FEATURE.ID" % (m_score)
-        
+
+        # Get Run ID information
+        run_ids_df = pd.read_sql_query("SELECT * FROM RUN", con)
         if run_id is None:
-            run_ids_df = pd.read_sql_query("SELECT * FROM RUN", con)
             if run_ids_df.shape[0] > 1:
-                raise click.ClickException(f"ERROR: Your input osw file {file} contains more than one run id! Most likely a merged osw, you need to explicilty supply --run_id ID in this case!\n{run_ids_df.to_string()}")
+                raise click.ClickException(
+                    f"ERROR: Your input osw file {file} contains more than one run id! Most likely a merged osw, you need to explicilty supply --run_id ID in this case!\n{run_ids_df.to_string()}")
             else:
                 run_id = run_ids_df.ID[0]
-                
+        else:
+            # Check to make sure supplied run id is actually a run in the osw file
+            if run_id not in run_ids_df[['ID']]:
+                raise click.ClickException(
+                    f"ERROR: The supplied run_id {run_id} is not a valid run_id in the input osw file {file}!\n{run_ids_df.to_string()}")
+
         if target_peptides is not None:
 
             if os.path.isfile(target_peptides):
@@ -462,29 +470,33 @@ class TargeteddiaPASEFExperiment(data_io):
             mz_array = spec.get_peaks()[0]
             int_array = spec.get_peaks()[1]
             im_array = spec.getFloatDataArrays()
-            # im_array = im_array[0].get_data() 
+            # im_array = im_array[0].get_data()
             # im_array = [str(im) for im in im_array]
             # im_array = [float(im) for im in im_array]
-            check_im_array(im_array[0].get_data() )
+            check_im_array(im_array[0].get_data())
             # TODO: sometimes the im_array memory view still gets destroyed or shows different float values?
-            im_match_bool = (im_array[0].get_data()  > im_start) & (im_array[0].get_data()  < im_end)
+            im_match_bool = (im_array[0].get_data() > im_start) & (
+                im_array[0].get_data() < im_end)
             # TODO: Think about how to vectorize this for-loop. Done.
             if spec.getMSLevel() == 1 and 1 in mslevel:
-                mz_match_bool = (mz_array > target_precursor_mz_lower) & (mz_array < target_precursor_mz_upper)
+                mz_match_bool = (mz_array > target_precursor_mz_lower) & (
+                    mz_array < target_precursor_mz_upper)
                 if verbose == 10 and any(mz_match_bool*im_match_bool):
                     logging.debug(
                         f"Adding MS1 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_precursor_mz_lower} m/z and {target_precursor_mz_upper} m/z and IM between {im_start} and {im_end}")
             elif spec.getMSLevel() == 2 and 2 in mslevel:
-                mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(target_product_upper_lower_list, len(mz_array)) )))
+                mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(
+                    target_product_upper_lower_list, len(mz_array)))))
                 if verbose == 10 and any(mz_match_bool*im_match_bool):
                     logging.debug(
                         f"Adding MS2 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_product_upper_lower_list} m/z and IM between {im_start} and {im_end}")
             # Only write out filtered spectra if there is any fitlered spectra to write out
             if any(mz_match_bool*im_match_bool):
-                extract_target_indices = np.where(mz_match_bool * im_match_bool)
+                extract_target_indices = np.where(
+                    mz_match_bool * im_match_bool)
                 filtered_mz = mz_array[extract_target_indices]
                 filtered_int = int_array[extract_target_indices]
-                filtered_im = im_array[0].get_data() [extract_target_indices]
+                filtered_im = im_array[0].get_data()[extract_target_indices]
                 # replace peak data with filtered peak data
                 spec.set_peaks((filtered_mz, filtered_int))
                 # repalce float data arrays with filtered ion mobility data
@@ -505,7 +517,8 @@ class TargeteddiaPASEFExperiment(data_io):
                     'peptide', self.peptides[target_peptide_group]['peptide'])
 
                 precursor = po.Precursor()
-                precursor.setCharge(self.peptides[target_peptide_group]['charge'])
+                precursor.setCharge(
+                    self.peptides[target_peptide_group]['charge'])
                 precursor.setMZ(
                     self.peptides[target_peptide_group]['precursor_mz'])
                 spec.setPrecursors([precursor])
