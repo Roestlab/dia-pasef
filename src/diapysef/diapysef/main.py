@@ -5,7 +5,7 @@ import sys
 import pickle as pkl
 from datetime import datetime
 
-from .util import setup_logger, argument_value_log
+from .util import setup_logger, argument_value_log, check_bruker_sdk
 from .targeted_data_extraction import TargeteddiaPASEFExperiment, generate_coordinates
 from .convert_tdf_to_mzml import convert_diapasef_tdf_to_mzml
 from .plotting import save_report_2d_rt_im_heatmap
@@ -19,6 +19,7 @@ def cli( ):
 
     Visit http://openswath.org/en/latest/docs/mobi-dik.html for usage instructions and help
     '''
+    check_bruker_sdk()
 
 
 # https://stackoverflow.com/a/47730333

@@ -2,6 +2,8 @@
 from __future__ import print_function
 import pyopenms
 import sys
+import os
+import platform
 import click
 import ast
 
@@ -12,6 +14,10 @@ import traceback
 from time import time
 import logging
 from datetime import datetime
+
+# Downloading data
+import urllib.request
+
 
 def setCompressionOptions(opt):
     """
@@ -44,6 +50,27 @@ def setCompressionOptions(opt):
         opt.setNumpressConfigurationFloatDataArray(cfg)
     except Exception:
         pass
+
+def check_bruker_sdk():
+    '''
+    Check if Bruker SDK exists, otherwise download Bruker SDK from opentims bruker bridge repository
+    '''
+
+    if platform.system() == 'Linux':
+        if not os.path.exists("libtimsdata.so"):
+            url = 'https://raw.githubusercontent.com/MatteoLacki/opentims_bruker_bridge/main/opentims_bruker_bridge/libtimsdata.so'
+            click.echo(f"INFO: Could not find Bruker SDK! Attempting to download one from: {url}")
+            filename, headers = urllib.request.urlretrieve(url, filename="libtimsdata.so")
+    elif platform.system() == 'Windows':
+        if not os.path.exists("timsdata.dll"):
+            if '64bit' in platform.architecture():
+                url = 'https://github.com/MatteoLacki/opentims_bruker_bridge/main/opentims_bruker_bridge/win64/timsdata.dll'
+                click.echo(f"INFO: Could not find Bruker SDK! Attempting to download one from: {url}")
+                filename, headers = urllib.request.urlretrieve(url, filename="timsdata.dll")
+            elif '32bit' in platform.architecture():
+                url = 'https://github.com/MatteoLacki/opentims_bruker_bridge/main/opentims_bruker_bridge/win32/timsdata.dll'
+                click.echo(f"INFO: Could not find Bruker SDK! Attempting to download one from: {url}")
+                filename, headers = urllib.request.urlretrieve(url, filename="timsdata.dll")
 
 def method_timer(f):
     @wraps(f)
