@@ -11,6 +11,7 @@ import contextlib
 import traceback
 from time import time
 import logging
+from datetime import datetime
 
 def setCompressionOptions(opt):
     """
@@ -98,6 +99,16 @@ def check_sqlite_table(con, table):
 
     return (table_present)
 
+def check_im_array(im_array):
+    '''
+    Check Ion Mobility Array to make sure values are valid
+    '''
+    
+    if any(im_array<0):
+      raise click.ClickException(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ERROR: There are values below 0 in the input ion mobility array! {im_array[im_array<0]}. Most likely a pyopenms memory view issue.")
+    elif 'e' in str(im_array):
+      raise click.ClickException(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ERROR: The input ion mobility array seems to be in scientific notation! {im_array}. Most likely a pyopenms memory view issue.")
+
 def type_cast_value(value):
     '''
     Convert a string value to python literal
@@ -108,3 +119,12 @@ def type_cast_value(value):
         return ast.literal_eval(value)
     except Exception:
         raise click.BadParameter(value)
+
+def argument_value_log(args_dict):
+    '''
+    Print argument and value
+    '''
+    logging.debug("---------------- Input Parameters --------------------------")
+    for key, item in args_dict.items():
+        logging.debug(f"Parameter: {key} = {item}")
+    logging.debug("------------------------------------------------------------\n")

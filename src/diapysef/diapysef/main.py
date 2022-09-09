@@ -5,7 +5,7 @@ import sys
 import pickle as pkl
 from datetime import datetime
 
-from .util import setup_logger
+from .util import setup_logger, argument_value_log
 from .targeted_data_extraction import TargeteddiaPASEFExperiment, generate_coordinates
 from .convert_tdf_to_mzml import convert_diapasef_tdf_to_mzml
 from .plotting import save_report_2d_rt_im_heatmap
@@ -41,13 +41,20 @@ class PythonLiteralOption(click.Option):
 @click.option('--im_window', default=0.06, show_default=True, type=float, help='The total window range of IM, i.e. a window of 0.06 would be 0.03 points to either side of the target IM.')
 @click.option('--mslevel', default='[1]', show_default=True, cls=PythonLiteralOption, help='list of mslevel(s) to extract data for. i.e. [1,2] would extract data for MS1 and MS2.')
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
-@click.option('--log_file', default='diapasef_data_extraction.log', show_default=True, type=str, help='Log file to save console messages.')
+@click.option('--log_file', default='mobidik_data_extraction.log', show_default=True, type=str, help='Log file to save console messages.')
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads to parallelize filtering of spectrums across threads.')
 def targeted_extraction( infile, target_coordinates, outfile, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads ):
   '''
   Extract from the raw data given a set of target coordinates to extract for.
   '''
-  
+
+  # Initialise logger
+  setup_logger(log_file, verbose)
+
+  if verbose == 10:
+        args_dict = locals()
+        argument_value_log(args_dict)
+
   if target_coordinates.endswith('.pkl'):
     pickle_file = open(target_coordinates, 'rb')
     peptides = pkl.load(pickle_file)
@@ -56,14 +63,16 @@ def targeted_extraction( infile, target_coordinates, outfile, mz_tol, rt_window,
   # Debug
   if False:
       infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/data/raw/IPP_M10_DIA-PaSEF_60min_Bruker10_400nL_1ul-inj-redo2_Slot2-25_1_2151.mzML"
-      target_coordinates = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/dia-pasef/src/diapysef/peptides_coord_ex.pkl"
+      target_coordinates = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/dia-pasef/src/diapysef/example/peptides_coord_ex.pkl"
       mz_tol = 20
       rt_window = 40
       im_window = 0.06
       verbose = 1
       log_file = "diapasef_data_extraction.log"
+      mslevel=[1,2]
+      threads=1
       
-  exp = TargeteddiaPASEFExperiment(infile, peptides, mz_tol, rt_window, im_window, mslevel, verbose, log_file, threads)
+  exp = TargeteddiaPASEFExperiment(infile, peptides, mz_tol, rt_window, im_window, mslevel, verbose, None, threads)
   click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
   exp.load_data()
   click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Reducing spectra using targeted coordinates...")
@@ -82,7 +91,14 @@ def export( infile, outfile, mslevel, verbose, log_file ):
     '''
     Export a reduced targeted mzML file to a tsv file
     '''
-    exp = TargeteddiaPASEFExperiment(infile, None, None, None, None, mslevel, verbose, log_file, None)
+    # Initialise logger
+    setup_logger(log_file, verbose)
+
+    if verbose == 10:
+        args_dict = locals()
+        argument_value_log(args_dict)
+
+    exp = TargeteddiaPASEFExperiment(infile, None, None, None, None, mslevel, verbose, None, None)
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
     exp.load_data(is_filtered=True)
     exp.save_filtered_tsv(mslevel, outfile)
@@ -105,6 +121,11 @@ def prepare_coordinates( infile, outfile, run_id, target_peptides, m_score, use_
     '''
     # Initialise logger
     setup_logger(log_file, verbose)
+
+    if verbose == 10:
+        args_dict = locals()
+        argument_value_log(args_dict)
+
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating coordinates...")
     generate_coordinates(infile, outfile, run_id, target_peptides, m_score, use_transition_peptide_mapping, use_only_detecting_transitions, verbose)
     click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished generating coordinates!")
@@ -131,12 +152,19 @@ def convertTDFtoMzML(analysis_dir, output_fname, merge_scans, keep_frames, verbo
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Data tsv file that contains data to be plotting. i.e peptide sequence, charge state, m/z, MS level, retention time, ion mobility, and intensity')
 @click.option('--out', 'outpdf', required=True, type=str, help='The pdf file name to save the plots to.')
 @click.option('--type', 'plot_type', default='rt_im_heatmap', show_default=True, type=click.Choice(['rt_im_heatmap']), help='Type of plot to generate.')
-# rt_im_heatmap
+# Plot Type: rt_im_heatmap Parameters
 @click.option('--plot_contours/--no-plot_contours', 'plot_contours', default=False, show_default=True, help='Should contour lines be plotted? Arg for type rt_im_heatmap')
-def report(infile, outpdf, plot_type, plot_contours):
+@click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
+@click.option('--log_file', default='mobidik_report.log', show_default=True, type=str, help='Log file to save console messages.')
+def report(infile, outpdf, plot_type, plot_contours, verbose, log_file):
     '''
     Generate a report for a specfific type of plot
     '''
+    # Initialise logger
+    setup_logger(log_file, verbose)
+    if verbose == 10:
+        args_dict = locals()
+        argument_value_log(args_dict)
     if plot_type=='rt_im_heatmap':
         click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Generating a report of plots for a Retention Time and Ion Mobility Heatmaps...")
         save_report_2d_rt_im_heatmap(infile, outpdf, plot_contours)
