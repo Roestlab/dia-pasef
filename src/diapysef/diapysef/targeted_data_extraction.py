@@ -3,7 +3,7 @@ import os
 
 # MS data modules
 import pyopenms as po
-from .util import setCompressionOptions, method_timer, code_block_timer, setup_logger, check_sqlite_table, type_cast_value
+from .util import setCompressionOptions, method_timer, code_block_timer, setup_logger, check_sqlite_table, check_im_array, type_cast_value
 
 
 # Logging and performance modules
@@ -173,10 +173,11 @@ class data_io():
     Class for data input and output operations
     """
 
-    def __init__(self, mzml_file, mz_tol=20, rt_window=50, im_window=0.06, mslevel=[1], verbose=0, log_file='diapasef_data_extraction.log'):
+    def __init__(self, mzml_file, mz_tol=20, rt_window=50, im_window=0.06, mslevel=[1], verbose=0, log_file=None):
 
         # Initialise logger
-        setup_logger(log_file, verbose)
+        if log_file is not None:
+            setup_logger(log_file, verbose)
 
         self.mzml_file = mzml_file
         self.mz_tol = mz_tol
@@ -299,7 +300,7 @@ class data_io():
                 mz, intensity = spec.get_peaks()
                 if (len(mz) == 0 and len(intensity) == 0):
                     logging.warn(
-                        f"Spectrum native id {spec.getNativeID()} had no m/z or intensity array, skipping this spectrum")
+                        f"MS{spec.getMSLevel()} spectrum native id {spec.getNativeID()} had no m/z or intensity array, skipping this spectrum")
                     continue
                 rt = np.full([mz.shape[0]], spec.getRT(), float)
                 # str_im = spec.getStringDataArrays()[0]
@@ -352,7 +353,7 @@ class TargeteddiaPASEFExperiment(data_io):
     Class for a targeted DIA-PASEF data extraction
     """
 
-    def __init__(self, mzml_file, peptides, mz_tol=20, rt_window=50, im_window=0.06, mslevel=[1], verbose=0, log_file='diapasef_data_extraction.log', threads=1):
+    def __init__(self, mzml_file, peptides, mz_tol=20, rt_window=50, im_window=0.06, mslevel=[1], verbose=0, log_file=None, threads=1):
         """
         Initialize data_access
         """
@@ -447,64 +448,71 @@ class TargeteddiaPASEFExperiment(data_io):
           If self contains a consumer, filtered spectrum is written to disk, otherwise the filtered spectrum MSSpectrum object is retuned
         """
         spec = self.exp.getSpectrum(spec_indice)
+        # TODO: Could remove this if RT check since we already restrict the spectra indices for our given RT range.
         if spec.getRT() >= rt_start and spec.getRT() <= rt_end:
             # Get data arrays
             mz_array = spec.get_peaks()[0]
             int_array = spec.get_peaks()[1]
-            im_array = spec.getFloatDataArrays()[0]
-            im_array = im_array.get_data()
+            im_array = spec.getFloatDataArrays()
+            # im_array = im_array[0].get_data() 
+            # im_array = [str(im) for im in im_array]
+            # im_array = [float(im) for im in im_array]
+            check_im_array(im_array[0].get_data() )
+            # TODO: sometimes the im_array memory view still gets destroyed or shows different float values?
+            im_match_bool = (im_array[0].get_data()  > im_start) & (im_array[0].get_data()  < im_end)
             # TODO: Think about how to vectorize this for-loop. Done.
             if spec.getMSLevel() == 1 and 1 in mslevel:
                 mz_match_bool = (mz_array > target_precursor_mz_lower) & (mz_array < target_precursor_mz_upper)
-                if verbose == 10 and any(mz_match_bool):
+                if verbose == 10 and any(mz_match_bool*im_match_bool):
                     logging.debug(
-                        f"Adding MS1 spectrum {spec.getNativeID()} filtered for {sum(mz_match_bool)} m/z spectra between {target_precursor_mz_lower} m/z and {target_precursor_mz_upper} m/z")
+                        f"Adding MS1 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_precursor_mz_lower} m/z and {target_precursor_mz_upper} m/z and IM between {im_start} and {im_end}")
             elif spec.getMSLevel() == 2 and 2 in mslevel:
                 mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(target_product_upper_lower_list, len(mz_array)) )))
-                if verbose == 10 and any(mz_match_bool):
+                if verbose == 10 and any(mz_match_bool*im_match_bool):
                     logging.debug(
-                        f"Adding MS2 spectrum {spec.getNativeID()} filtered for {sum(mz_match_bool)} m/z spectra between {target_product_upper_lower_list} m/z")
-            im_match_bool = (im_array > im_start) & (im_array < im_end)
-            extract_target_indices = np.where(mz_match_bool * im_match_bool)
-            filtered_mz = mz_array[extract_target_indices]
-            filtered_int = int_array[extract_target_indices]
-            filtered_im = im_array[extract_target_indices]
-            # replace peak data with filtered peak data
-            spec.set_peaks((filtered_mz, filtered_int))
-            # repalce float data arrays with filtered ion mobility data
-            fda = po.FloatDataArray()
-            filtered_im_np = np.array(filtered_im).astype(np.float32)
-            fda.set_data(filtered_im_np)
-            fda.setName("Ion Mobility")
-            # TODO: There currently is an issue when setting float data array. Getting Float Data Array does not match input
-            spec.setFloatDataArrays([fda])
-            # Temp solution: Add string data of filtered ion mobility data
-            # TODO: Remove temp solution, since it is no longer needed.
-            sda = po.StringDataArray()
-            sda.setName("String Ion Mobility")
-            _ = [sda.push_back(str(im_val)) for im_val in filtered_im]
-            spec.setStringDataArrays([sda])
-            # Set peptide meta data
-            spec.setMetaValue(
-                'peptide', self.peptides[target_peptide_group]['peptide'])
+                        f"Adding MS2 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_product_upper_lower_list} m/z and IM between {im_start} and {im_end}")
+            # Only write out filtered spectra if there is any fitlered spectra to write out
+            if any(mz_match_bool*im_match_bool):
+                extract_target_indices = np.where(mz_match_bool * im_match_bool)
+                filtered_mz = mz_array[extract_target_indices]
+                filtered_int = int_array[extract_target_indices]
+                filtered_im = im_array[0].get_data() [extract_target_indices]
+                # replace peak data with filtered peak data
+                spec.set_peaks((filtered_mz, filtered_int))
+                # repalce float data arrays with filtered ion mobility data
+                fda = po.FloatDataArray()
+                filtered_im_np = np.array(filtered_im).astype(np.float32)
+                fda.set_data(filtered_im_np)
+                fda.setName("Ion Mobility")
+                # TODO: There currently is an issue when setting float data array. Getting Float Data Array does not match input
+                spec.setFloatDataArrays([fda])
+                # Temp solution: Add string data of filtered ion mobility data
+                # TODO: Remove temp solution, since it is no longer needed.
+                sda = po.StringDataArray()
+                sda.setName("String Ion Mobility")
+                _ = [sda.push_back(str(im_val)) for im_val in filtered_im]
+                spec.setStringDataArrays([sda])
+                # Set peptide meta data
+                spec.setMetaValue(
+                    'peptide', self.peptides[target_peptide_group]['peptide'])
 
-            precursor = po.Precursor()
-            precursor.setCharge(self.peptides[target_peptide_group]['charge'])
-            precursor.setMZ(
-                self.peptides[target_peptide_group]['precursor_mz'])
-            spec.setPrecursors([precursor])
+                precursor = po.Precursor()
+                precursor.setCharge(self.peptides[target_peptide_group]['charge'])
+                precursor.setMZ(
+                    self.peptides[target_peptide_group]['precursor_mz'])
+                spec.setPrecursors([precursor])
 
-            # Set Prodcut mz values
-            spec.setProducts([self.set_product(
-                mz, ) for mz in self.peptides[target_peptide_group]['product_mz']])
+                # Set Prodcut mz values
+                spec.setProducts([self.set_product(
+                    mz, ) for mz in self.peptides[target_peptide_group]['product_mz']])
 
-            # Write out filtered spectra to file if consumer present. This is more memory efficient
-            # TODO: Once paralization works, will need to think about how writing to consumer will be affected
-            if self.consumer is not None:
-                self.consumer.consumeSpectrum(spec)
-            else:
-                # If you have a lot of filtered spectra to return, it becomes memory heavy.
-                return spec
+                # Write out filtered spectra to file if consumer present. This is more memory efficient
+                # TODO: Once paralization works, will need to think about how writing to consumer will be affected
+                if self.consumer is not None:
+                    self.consumer.consumeSpectrum(spec)
+                else:
+                    # If you have a lot of filtered spectra to return, it becomes memory heavy.
+                    return spec
 
     @method_timer
     def reduce_spectra(self, output_spectra_file=None):
@@ -581,7 +589,7 @@ class TargeteddiaPASEFExperiment(data_io):
                 self.mslevel_indices, use_rt_spec_indices)
             # spectra_list = [spectra_dict[indice] for indice in np.intersect1d(self.mslevel_indices, use_rt_spec_indices)]
 
-            with code_block_timer(f"Filtering Spectra..."):
+            with code_block_timer(f"Filtering {target_spectra_indices.shape[0]} Spectra for {target_peptide_group}..."):
                 try:
                     # TODO: Get prallelization to work.
                     # Current Error is with cython __reduce__
