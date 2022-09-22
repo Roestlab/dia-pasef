@@ -25,8 +25,7 @@ setup(name='diapysef',
           'patsy',
           'tqdm',
           'joblib',
-          'click',
-          'logging'],
+          'click'],
       package_data={
           'diapysef': ['data/*']
       },
