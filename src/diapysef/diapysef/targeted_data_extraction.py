@@ -21,28 +21,29 @@ import pickle as pkl
 from joblib import Parallel, delayed, wrap_non_picklable_objects
 
 
-def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, m_score=0.05, use_transition_peptide_mapping=False, use_only_detecting_transitions=True, verbose=0):
+def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None, m_score=0.05, use_transition_peptide_mapping=False, use_only_detecting_transitions=True, verbose=0):
     """
     Generate a dictionary of target coordinates to extract from Raw diaPASEF mzML data
 
     Params:
-      file: a file to generate coordinates from.
+      infile: a file to generate coordinates from.
 
     Returns:
       a pickle file containing a dictionary of target coordinates
     """
     # For internal debugging
     if False:
-        file = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/results/20220824_single_mzml_im_cal_linear/osw/merged.osw"
+        infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/results/20220824_single_mzml_im_cal_linear/osw/merged.osw"
         target_peptides = ["T(UniMod:21)ELISVSEVHPSR", "TELIS(UniMod:21)VSEVHPSR", "TELISVS(UniMod:21)EVHPSR", "TELISVSEVHPS(UniMod:21)R", "LGDLNY(UniMod:21)LIYVFPDRPK", "LGDLNYLIY(UniMod:21)VFPDRPK",
                            "Y(UniMod:21)VC(UniMod:4)EGPSHGGLPGASSEK", "YVC(UniMod:4)EGPS(UniMod:21)HGGLPGASSEK", "YVC(UniMod:4)EGPSHGGLPGAS(UniMod:21)SEK", "YVC(UniMod:4)EGPSHGGLPGASS(UniMod:21)EK"]
+         # target_peptides = ['T(UniMod:21)ELISVSEVHPSR', 'TELIS(UniMod:21)VSEVHPSR', 'TELISVS(UniMod:21)EVHPSR', 'TELISVSEVHPS(UniMod:21)R', 'LGDLNY(UniMod:21)LIYVFPDRPK', 'LGDLNYLIY(UniMod:21)VFPDRPK', 'Y(UniMod:21)VC(UniMod:4)EGPSHGGLPGASSEK', 'YVC(UniMod:4)EGPS(UniMod:21)HGGLPGASSEK', 'YVC(UniMod:4)EGPSHGGLPGAS(UniMod:21)SEK', 'YVC(UniMod:4)EGPSHGGLPGASS(UniMod:21)EK]'
         run_id = 8174980892860667876
 
-    if file.lower().endswith("osw"):
+    if infile.lower().endswith("osw"):
         if verbose == 10:
             logging.debug(
-                f"Connecting to OSW identifications database: {file}")
-        con = sql3.connect(file)
+                f"Connecting to OSW identifications database: {infile}")
+        con = sql3.connect(infile)
 
         if use_transition_peptide_mapping:
             use_transition_map = "INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID"
@@ -67,22 +68,22 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
         if run_id is None:
             if run_ids_df.shape[0] > 1:
                 raise click.ClickException(
-                    f"ERROR: Your input osw file {file} contains more than one run id! Most likely a merged osw, you need to explicilty supply --run_id ID in this case!\n{run_ids_df.to_string()}")
+                    f"ERROR: Your input osw file {infile} contains more than one run id! Most likely a merged osw, you need to explicilty supply --run_id ID in this case!\n{run_ids_df.to_string()}")
             else:
                 run_id = run_ids_df.ID[0]
         else:
             # Check to make sure supplied run id is actually a run in the osw file
-            if run_id not in run_ids_df[['ID']]:
+            if run_id not in run_ids_df['ID'].to_list():
                 raise click.ClickException(
-                    f"ERROR: The supplied run_id {run_id} is not a valid run_id in the input osw file {file}!\n{run_ids_df.to_string()}")
+                    f"ERROR: The supplied run_id {run_id} is not a valid run_id in the input osw file {infile}!\n{run_ids_df.to_string()}")
 
         if target_peptides is not None:
 
             if os.path.isfile(target_peptides):
                 logging.info(
                     f"Reading target peptides from file: {target_peptides}")
-                with open(target_peptides, 'r') as file:
-                    data = file.read().replace('\n', '')
+                with open(target_peptides, 'r') as file_handle:
+                    data = file_handle.read().replace('\n', '')
                 target_peptides = [peptide.strip()
                                    for peptide in data.split(',')]
             elif type(target_peptides) == str:
@@ -125,12 +126,17 @@ def generate_coordinates(file, outfile=None, run_id=None, target_peptides=None, 
         WHERE FEATURE.RUN_ID=%s
       ) AS FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
       %s
-      ''' % ('","'.join(target_peptides), use_transition_map, detecting_col, join_on_transition_table_id, run_id, join_on_score_table)
+      ''' % ('","'.join(target_peptides), use_transition_map, detecting_col, join_on_transition_table_id, run_id, join_on_score_table )
 
             if verbose == 10:
                 logging.debug(f"Injecting SQL Query:\n{sql_query}")
 
             data = pd.read_sql_query(sql_query, con)
+            
+            if data.shape[0]==0:
+                raise click.ClickException(
+                    f"ERROR: Seems like there were none of the target peptides {', '.join(target_peptides)} found in the input osw file {infile}!\n{data.to_string()}")
+
 
             data['group_id'] = data['peptide'] + \
                 '_' + data['charge'].astype(str)
@@ -227,7 +233,7 @@ class data_io():
 
             self.filtered = exp
         else:
-            # TODO: For some reason the OnDiscExperiment doesn't read StringMetaData, which s currecntly used to store filtered IM data
+            # TODO: For some reason the OnDiscExperiment doesn't read StringMetaData, which is currecntly used to store filtered IM data
             with code_block_timer('Creating OnDiscExperiment...', logging.debug):
                 exp = po.OnDiscMSExperiment()
 
