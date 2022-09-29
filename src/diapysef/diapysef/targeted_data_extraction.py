@@ -532,9 +532,6 @@ class TargeteddiaPASEFExperiment(data_io):
                     int_array = np.array(self.exp.getSpectrumById(spec_indice).getDataArrays()[1].data)
                     im_array = np.array(self.exp.getSpectrumById(spec_indice).getDataArrays()[2].data)
 
-            # im_array = im_array[0].get_data()
-            # im_array = [str(im) for im in im_array]
-            # im_array = [float(im) for im in im_array]
             # check_im_array(im_array[0].get_data()) # TODO: Probably don't need to check im_array anymore? 
             # TODO: sometimes the im_array memory view still gets destroyed or shows different float values?
             if (self.readOptions=="ondisk"): # TODO: Can we get rid of these annoying if statement checks? I guess we do this because in ondisk exp we need the get_data view
