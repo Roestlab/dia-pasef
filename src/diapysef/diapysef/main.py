@@ -45,11 +45,11 @@ class PythonLiteralOption(click.Option):
 @click.option('--rt_window', default=50, show_default=True, type=int, help='The total window range of RT, i.e. a window of 50 would be 25 points to either side of the target RT.')
 @click.option('--im_window', default=0.06, show_default=True, type=float, help='The total window range of IM, i.e. a window of 0.06 would be 0.03 points to either side of the target IM.')
 @click.option('--mslevel', default='[1]', show_default=True, cls=PythonLiteralOption, help='list of mslevel(s) to extract data for. i.e. [1,2] would extract data for MS1 and MS2.')
-@click.option('--readOptions', default='ondisk', show_default=True, type=click.Choice(['ondisk', 'cached']), help='Context to estimate gene-level FDR control.')
+@click.option('--readOptions', 'readoptions', default='ondisk', show_default=True, type=click.Choice(['ondisk', 'cached']), help='Context to estimate gene-level FDR control.')
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
 @click.option('--log_file', default='mobidik_data_extraction.log', show_default=True, type=str, help='Log file to save console messages.')
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads to parallelize filtering of spectrums across threads.')
-def targeted_extraction(infile, target_coordinates, outfile, mz_tol, rt_window, im_window, mslevel, readOptions, verbose, log_file, threads):
+def targeted_extraction(infile, target_coordinates, outfile, mz_tol, rt_window, im_window, mslevel, readoptions, verbose, log_file, threads):
     '''
     Extract from the raw data given a set of target coordinates to extract for.
     '''
@@ -78,9 +78,10 @@ def targeted_extraction(infile, target_coordinates, outfile, mz_tol, rt_window, 
         log_file = "diapasef_data_extraction.log"
         mslevel = [1, 2]
         threads = 1
+        readOptions="ondisk"
 
     exp = TargeteddiaPASEFExperiment(
-        infile, peptides, mz_tol, rt_window, im_window, mslevel, verbose, None, threads)
+        infile, peptides, mz_tol, rt_window, im_window, mslevel, readoptions, verbose, None, threads)
     click.echo(
         f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
     exp.load_data()
