@@ -1,0 +1,24 @@
+BootStrap: docker
+From: ubuntu:18.04
+
+
+%environment
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+
+%post
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+    apt-get -y update
+    apt-get install -y python3-pip zlib1g libjpeg-dev zlib1g-dev git libtiff5
+    python3 -m pip install --upgrade pip
+    
+    cd /lib
+    git clone -b feature/targeed_data_extraction https://github.com/singjc/dia-pasef.git
+    pip3 install /lib/dia-pasef/src/diapysef
+
+
+%labels
+    Author Joshua C
