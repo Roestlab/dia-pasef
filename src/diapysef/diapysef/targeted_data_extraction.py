@@ -504,103 +504,106 @@ class TargeteddiaPASEFExperiment(data_io):
         Return:
           If self contains a consumer, filtered spectrum is written to disk, otherwise the filtered spectrum MSSpectrum object is retuned
         """
+        # if (self.readOptions=="ondisk"):
+        #     with code_block_timer(f'Extracting spectrum {spec_indice}...', logging.debug):
+        #         spec = self.exp.getSpectrum(spec_indice)
+        # elif (self.readOptions=="cached"):
+        #     with code_block_timer(f'Extracting spectrum meta data {spec_indice}...', logging.debug):
+        #         spec = self.meta_data.getSpectrum(spec_indice)
+        #     # with code_block_timer(f'Extracting spectrum data {spec_indice}...', logging.debug):
+        #     #     spec_data_arrays = self.exp.getSpectrumById(spec_indice)
+        # else:
+        #     click.ClickException(f"ERROR: Unknown readOptions ({self.readOptions}) given! Has to be one of 'ondisk', 'cached'")
+        # TODO: Could remove this if RT check since we already restrict the spectra indices for our given RT range.
+        # if spec.getRT() >= rt_start and spec.getRT() <= rt_end:
+        # Get data arrays
         if (self.readOptions=="ondisk"):
-            with code_block_timer(f'Extracting spectrum {spec_indice}...', logging.debug):
+            with code_block_timer(f'Extracting mz, int, im data arrays...', logging.debug):
                 spec = self.exp.getSpectrum(spec_indice)
+                mz_array = spec.get_peaks()[0]
+                int_array = spec.get_peaks()[1]
+                im_array = spec.getFloatDataArrays()
         elif (self.readOptions=="cached"):
-            with code_block_timer(f'Extracting spectrum meta data {spec_indice}...', logging.debug):
-                spec = self.meta_data.getSpectrum(spec_indice)
-            # with code_block_timer(f'Extracting spectrum data {spec_indice}...', logging.debug):
-            #     spec_data_arrays = self.exp.getSpectrumById(spec_indice)
+            spec = self.meta_data.getSpectrum(spec_indice)
+            with code_block_timer(f'Extracting mz, int, im data arrays...', logging.debug):
+                # mz_array = np.copy(spec_data_arrays.getMZArray_mv())
+                # int_array = np.copy(spec_data_arrays.getIntensityArray_mv())
+                # im_array = np.copy(spec_data_arrays.getDriftTimeArray_mv())
+                das = self.exp.getSpectrumById(spec_indice).getDataArrays()
+                mz_array = das[0].getData()
+                int_array = das[1].getData()
+                im_array = das[2].getData()
         else:
             click.ClickException(f"ERROR: Unknown readOptions ({self.readOptions}) given! Has to be one of 'ondisk', 'cached'")
-        # TODO: Could remove this if RT check since we already restrict the spectra indices for our given RT range.
-        if spec.getRT() >= rt_start and spec.getRT() <= rt_end:
-            # Get data arrays
-            if (self.readOptions=="ondisk"):
-                with code_block_timer(f'Extracting mz, int, im data arrays...', logging.debug):
-                    mz_array = spec.get_peaks()[0]
-                    int_array = spec.get_peaks()[1]
-                    im_array = spec.getFloatDataArrays()
-            elif (self.readOptions=="cached"):
-                with code_block_timer(f'Extracting mz, int, im data arrays...', logging.debug):
-                    # mz_array = np.array(spec_data_arrays.getMZArray())
-                    # int_array = np.array(spec_data_arrays.getIntensityArray())
-                    # im_array = np.array(spec_data_arrays.getDriftTimeArray())
-                    # das = self.exp.getSpectrumById(spec_indice).getDataArrays()
-                    mz_array = np.array(self.exp.getSpectrumById(spec_indice).getDataArrays()[0].data)
-                    int_array = np.array(self.exp.getSpectrumById(spec_indice).getDataArrays()[1].data)
-                    im_array = np.array(self.exp.getSpectrumById(spec_indice).getDataArrays()[2].data)
+        # check_im_array(im_array[0].get_data()) # TODO: Probably don't need to check im_array anymore? 
+        # TODO: sometimes the im_array memory view still gets destroyed or shows different float values?
+        if (self.readOptions=="ondisk"): # TODO: Can we get rid of these annoying if statement checks? I guess we do this because in ondisk exp we need the get_data view
+            im_match_bool = (im_array[0].get_data() > im_start) & (
+                im_array[0].get_data() < im_end)
+        elif (self.readOptions=="cached"):
+            im_match_bool = (im_array > im_start) & (
+                im_array < im_end)
+        # TODO: Think about how to vectorize this for-loop. Done.
+        if spec.getMSLevel() == 1 and 1 in mslevel:
+            mz_match_bool = (mz_array > target_precursor_mz_lower) & (
+                mz_array < target_precursor_mz_upper)
+            if verbose == 10 and any(mz_match_bool*im_match_bool):
+                logging.debug(
+                    f"Adding MS1 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_precursor_mz_lower} m/z and {target_precursor_mz_upper} m/z and IM between {im_start} and {im_end}")
+        elif spec.getMSLevel() == 2 and 2 in mslevel:
+            mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(
+                target_product_upper_lower_list, len(mz_array)))))
+            if verbose == 10 and any(mz_match_bool*im_match_bool):
+                logging.debug(
+                    f"Adding MS2 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_product_upper_lower_list} m/z and IM between {im_start} and {im_end}")
+        # Only write out filtered spectra if there is any fitlered spectra to write out
+        if any(mz_match_bool*im_match_bool):
+            with code_block_timer(f'Getting filtered spectrum...', logging.debug):
+                extract_target_indices = np.where(
+                    mz_match_bool * im_match_bool)
+                filtered_mz = mz_array[extract_target_indices]
+                filtered_int = int_array[extract_target_indices]
+                if (self.readOptions=="ondisk"):
+                    filtered_im = im_array[0].get_data()[extract_target_indices]
+                elif (self.readOptions=="cached"):
+                    filtered_im = im_array[extract_target_indices]
+                # replace peak data with filtered peak data
+                spec.set_peaks((filtered_mz, filtered_int))
+                # repalce float data arrays with filtered ion mobility data
+                fda = po.FloatDataArray()
+                filtered_im_np = np.array(filtered_im).astype(np.float32)
+                fda.set_data(filtered_im_np)
+                fda.setName("Ion Mobility")
+                # TODO: There currently is an issue when setting float data array. Getting Float Data Array does not match input
+                spec.setFloatDataArrays([fda])
+                # Temp solution: Add string data of filtered ion mobility data
+                # TODO: Remove temp solution, since it is no longer needed.
+                sda = po.StringDataArray()
+                sda.setName("String Ion Mobility")
+                _ = [sda.push_back(str(im_val)) for im_val in filtered_im]
+                spec.setStringDataArrays([sda])
+                # Set peptide meta data
+                spec.setMetaValue(
+                    'peptide', self.peptides[target_peptide_group]['peptide'])
 
-            # check_im_array(im_array[0].get_data()) # TODO: Probably don't need to check im_array anymore? 
-            # TODO: sometimes the im_array memory view still gets destroyed or shows different float values?
-            if (self.readOptions=="ondisk"): # TODO: Can we get rid of these annoying if statement checks? I guess we do this because in ondisk exp we need the get_data view
-                im_match_bool = (im_array[0].get_data() > im_start) & (
-                    im_array[0].get_data() < im_end)
-            elif (self.readOptions=="cached"):
-                im_match_bool = (im_array > im_start) & (
-                    im_array < im_end)
-            # TODO: Think about how to vectorize this for-loop. Done.
-            if spec.getMSLevel() == 1 and 1 in mslevel:
-                mz_match_bool = (mz_array > target_precursor_mz_lower) & (
-                    mz_array < target_precursor_mz_upper)
-                if verbose == 10 and any(mz_match_bool*im_match_bool):
-                    logging.debug(
-                        f"Adding MS1 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_precursor_mz_lower} m/z and {target_precursor_mz_upper} m/z and IM between {im_start} and {im_end}")
-            elif spec.getMSLevel() == 2 and 2 in mslevel:
-                mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(
-                    target_product_upper_lower_list, len(mz_array)))))
-                if verbose == 10 and any(mz_match_bool*im_match_bool):
-                    logging.debug(
-                        f"Adding MS2 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_product_upper_lower_list} m/z and IM between {im_start} and {im_end}")
-            # Only write out filtered spectra if there is any fitlered spectra to write out
-            if any(mz_match_bool*im_match_bool):
-                with code_block_timer(f'Getting filtered spectrum...', logging.debug):
-                    extract_target_indices = np.where(
-                        mz_match_bool * im_match_bool)
-                    filtered_mz = mz_array[extract_target_indices]
-                    filtered_int = int_array[extract_target_indices]
-                    if (self.readOptions=="ondisk"):
-                        filtered_im = im_array[0].get_data()[extract_target_indices]
-                    elif (self.readOptions=="cached"):
-                        filtered_im = im_array[extract_target_indices]
-                    # replace peak data with filtered peak data
-                    spec.set_peaks((filtered_mz, filtered_int))
-                    # repalce float data arrays with filtered ion mobility data
-                    fda = po.FloatDataArray()
-                    filtered_im_np = np.array(filtered_im).astype(np.float32)
-                    fda.set_data(filtered_im_np)
-                    fda.setName("Ion Mobility")
-                    # TODO: There currently is an issue when setting float data array. Getting Float Data Array does not match input
-                    spec.setFloatDataArrays([fda])
-                    # Temp solution: Add string data of filtered ion mobility data
-                    # TODO: Remove temp solution, since it is no longer needed.
-                    sda = po.StringDataArray()
-                    sda.setName("String Ion Mobility")
-                    _ = [sda.push_back(str(im_val)) for im_val in filtered_im]
-                    spec.setStringDataArrays([sda])
-                    # Set peptide meta data
-                    spec.setMetaValue(
-                        'peptide', self.peptides[target_peptide_group]['peptide'])
+                precursor = po.Precursor()
+                precursor.setCharge(
+                    self.peptides[target_peptide_group]['charge'])
+                precursor.setMZ(
+                    self.peptides[target_peptide_group]['precursor_mz'])
+                spec.setPrecursors([precursor])
 
-                    precursor = po.Precursor()
-                    precursor.setCharge(
-                        self.peptides[target_peptide_group]['charge'])
-                    precursor.setMZ(
-                        self.peptides[target_peptide_group]['precursor_mz'])
-                    spec.setPrecursors([precursor])
+                # Set Prodcut mz values
+                spec.setProducts([self.set_product(
+                    mz, ) for mz in self.peptides[target_peptide_group]['product_mz']])
 
-                    # Set Prodcut mz values
-                    spec.setProducts([self.set_product(
-                        mz, ) for mz in self.peptides[target_peptide_group]['product_mz']])
-
-                # Write out filtered spectra to file if consumer present. This is more memory efficient
-                # TODO: Once paralization works, will need to think about how writing to consumer will be affected
-                if self.consumer is not None:
-                    self.consumer.consumeSpectrum(spec)
-                else:
-                    # If you have a lot of filtered spectra to return, it becomes memory heavy.
-                    return spec
+            # Write out filtered spectra to file if consumer present. This is more memory efficient
+            # TODO: Once paralization works, will need to think about how writing to consumer will be affected
+            if self.consumer is not None:
+                self.consumer.consumeSpectrum(spec)
+            else:
+                # If you have a lot of filtered spectra to return, it becomes memory heavy.
+                return spec
 
     @method_timer
     def reduce_spectra(self, output_spectra_file=None):
