@@ -64,11 +64,11 @@ def check_bruker_sdk():
     elif platform.system() == 'Windows':
         if not os.path.exists("timsdata.dll"):
             if '64bit' in platform.architecture():
-                url = 'https://github.com/MatteoLacki/opentims_bruker_bridge/main/opentims_bruker_bridge/win64/timsdata.dll'
+                url = 'https://raw.githubusercontent.com/MatteoLacki/opentims_bruker_bridge/main/opentims_bruker_bridge/win64/timsdata.dll'
                 click.echo(f"INFO: Could not find Bruker SDK! Attempting to download one from: {url}")
                 filename, headers = urllib.request.urlretrieve(url, filename="timsdata.dll")
             elif '32bit' in platform.architecture():
-                url = 'https://github.com/MatteoLacki/opentims_bruker_bridge/main/opentims_bruker_bridge/win32/timsdata.dll'
+                url = 'https://raw.githubusercontent.com/MatteoLacki/opentims_bruker_bridge/main/opentims_bruker_bridge/win32/timsdata.dll'
                 click.echo(f"INFO: Could not find Bruker SDK! Attempting to download one from: {url}")
                 filename, headers = urllib.request.urlretrieve(url, filename="timsdata.dll")
 
