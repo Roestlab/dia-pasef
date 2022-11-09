@@ -45,7 +45,7 @@ def get_product_charge(msl, msms):
 
 def align_rt(msms_irt, ms, runs, rt_alignment, pdfout, remove_outliers = True):
     """Retention time alignment"""
-    if rt_alignment is 'linear':
+    if rt_alignment == 'linear':
         print('Aligning retention time linearly ...')
         # Generate the iRT calibrators
         calibrators = []
@@ -60,7 +60,7 @@ def align_rt(msms_irt, ms, runs, rt_alignment, pdfout, remove_outliers = True):
         ms['irt'] = ms.intercept + ms.slope * ms['Retention time']
         ms = ms.drop(columns=['intercept', 'slope'])
         
-    elif rt_alignment is 'nonlinear':
+    elif rt_alignment == 'nonlinear':
         print('Aligning retention time with lowess fitting ...')
         lowess = smnonlinear.nonparametric.lowess
         pp = PdfPages(pdfout)
