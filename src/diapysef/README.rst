@@ -549,3 +549,40 @@ Or in python:
 
 .. image:: img/output_7_1.png
 
+Docker image
+============
+
+There is a docker image available on docker hub `singjust/modibik <https://hub.docker.com/r/singjust/mobidik>`_
+
+.. raw:: html
+
+   <details>
+   <summary>Useage</summary>
+
+.. code:: bash
+
+    $ docker run -it --rm -v $PWD:/data/ singjust/mobidik:latest diapysef --help
+    Found Bruker sdk. Access to the raw data is possible. 
+
+    Usage: diapysef [OPTIONS] COMMAND1 [ARGS]... [COMMAND2 [ARGS]...]...
+
+    Mobi-DIK (Ion Mobility DIA Tool-Kit) is a package for analysis of DIA data
+    coupled to ion mobility.
+
+    Visit http://openswath.org/en/latest/docs/mobi-dik.html for usage
+    instructions and help
+
+    Options:
+    --version  Show the version and exit.
+    --help     Show this message and exit.
+
+    Commands:
+    converttdftomzml     Conversion program to convert a Bruker TIMS .d...
+    export               Export a reduced targeted mzML file to a tsv file
+    prepare-coordinates  Generate peptide coordinates for targeted...
+    report               Generate a report for a specfific type of plot
+    targeted-extraction  Extract from the raw data given a set of target...
+
+.. raw:: html
+
+   </details>
