@@ -1,7 +1,7 @@
 from setuptools import setup
 
 def readme():
-    with open('README.rst') as f:
+    with open('PYPI_README.rst') as f:
         return f.read()
 
 desc = """\
@@ -39,4 +39,5 @@ setup(name='diapysef',
                'scripts/plot_dia_windows.py',
                'scripts/create_library.py',
                'scripts/high_precision_irt.py'],
-      zip_safe=False)
+      zip_safe=False,
+    )
