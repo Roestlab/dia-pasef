@@ -32,13 +32,6 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
     Returns:
       a pickle file containing a dictionary of target coordinates
     """
-    # For internal debugging
-    if False:
-        infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/results/20220824_single_mzml_im_cal_linear/osw/merged.osw"
-        target_peptides = ["T(UniMod:21)ELISVSEVHPSR", "TELIS(UniMod:21)VSEVHPSR", "TELISVS(UniMod:21)EVHPSR", "TELISVSEVHPS(UniMod:21)R", "LGDLNY(UniMod:21)LIYVFPDRPK", "LGDLNYLIY(UniMod:21)VFPDRPK",
-                           "Y(UniMod:21)VC(UniMod:4)EGPSHGGLPGASSEK", "YVC(UniMod:4)EGPS(UniMod:21)HGGLPGASSEK", "YVC(UniMod:4)EGPSHGGLPGAS(UniMod:21)SEK", "YVC(UniMod:4)EGPSHGGLPGASS(UniMod:21)EK"]
-         # target_peptides = ['T(UniMod:21)ELISVSEVHPSR', 'TELIS(UniMod:21)VSEVHPSR', 'TELISVS(UniMod:21)EVHPSR', 'TELISVSEVHPS(UniMod:21)R', 'LGDLNY(UniMod:21)LIYVFPDRPK', 'LGDLNYLIY(UniMod:21)VFPDRPK', 'Y(UniMod:21)VC(UniMod:4)EGPSHGGLPGASSEK', 'YVC(UniMod:4)EGPS(UniMod:21)HGGLPGASSEK', 'YVC(UniMod:4)EGPSHGGLPGAS(UniMod:21)SEK', 'YVC(UniMod:4)EGPSHGGLPGASS(UniMod:21)EK]'
-        run_id = 8174980892860667876
 
     if infile.lower().endswith("osw"):
         if verbose == 10:
@@ -320,8 +313,6 @@ class data_io():
             if spec.getMSLevel() in ms_level:
                 mz, intensity = spec.get_peaks()
                 rt = np.full([mz.shape[0]], spec.getRT(), float)
-                # str_im = spec.getStringDataArrays()[0]
-                # im = np.array([float(s) for s in str_im]).astype(np.float32)
                 im_tmp = spec.getFloatDataArrays()[0]
                 im = im_tmp.get_data()
                 add_df = pd.DataFrame({'native_id': spec.getNativeID(), 'ms_level': spec.getMSLevel(
@@ -349,8 +340,6 @@ class data_io():
                         f"MS{spec.getMSLevel()} spectrum native id {spec.getNativeID()} had no m/z or intensity array, skipping this spectrum")
                     continue
                 rt = np.full([mz.shape[0]], spec.getRT(), float)
-                # str_im = spec.getStringDataArrays()[0]
-                # im = np.array([float(s) for s in str_im]).astype(np.float32)
                 im_tmp = spec.getFloatDataArrays()[0]
                 im = im_tmp.get_data()
                 precursor = spec.getPrecursors()[0]
@@ -504,18 +493,6 @@ class TargeteddiaPASEFExperiment(data_io):
         Return:
           If self contains a consumer, filtered spectrum is written to disk, otherwise the filtered spectrum MSSpectrum object is retuned
         """
-        # if (self.readOptions=="ondisk"):
-        #     with code_block_timer(f'Extracting spectrum {spec_indice}...', logging.debug):
-        #         spec = self.exp.getSpectrum(spec_indice)
-        # elif (self.readOptions=="cached"):
-        #     with code_block_timer(f'Extracting spectrum meta data {spec_indice}...', logging.debug):
-        #         spec = self.meta_data.getSpectrum(spec_indice)
-        #     # with code_block_timer(f'Extracting spectrum data {spec_indice}...', logging.debug):
-        #     #     spec_data_arrays = self.exp.getSpectrumById(spec_indice)
-        # else:
-        #     click.ClickException(f"ERROR: Unknown readOptions ({self.readOptions}) given! Has to be one of 'ondisk', 'cached'")
-        # TODO: Could remove this if RT check since we already restrict the spectra indices for our given RT range.
-        # if spec.getRT() >= rt_start and spec.getRT() <= rt_end:
         # Get data arrays
         if (self.readOptions=="ondisk"):
             with code_block_timer(f'Extracting mz, int, im data arrays...', logging.debug):
@@ -526,24 +503,20 @@ class TargeteddiaPASEFExperiment(data_io):
         elif (self.readOptions=="cached"):
             spec = self.meta_data.getSpectrum(spec_indice)
             with code_block_timer(f'Extracting mz, int, im data arrays...', logging.debug):
-                # mz_array = np.copy(spec_data_arrays.getMZArray_mv())
-                # int_array = np.copy(spec_data_arrays.getIntensityArray_mv())
-                # im_array = np.copy(spec_data_arrays.getDriftTimeArray_mv())
                 das = self.exp.getSpectrumById(spec_indice).getDataArrays()
                 mz_array = das[0].getData()
                 int_array = das[1].getData()
                 im_array = das[2].getData()
         else:
             click.ClickException(f"ERROR: Unknown readOptions ({self.readOptions}) given! Has to be one of 'ondisk', 'cached'")
-        # check_im_array(im_array[0].get_data()) # TODO: Probably don't need to check im_array anymore? 
-        # TODO: sometimes the im_array memory view still gets destroyed or shows different float values?
+        
         if (self.readOptions=="ondisk"): # TODO: Can we get rid of these annoying if statement checks? I guess we do this because in ondisk exp we need the get_data view
             im_match_bool = (im_array[0].get_data() > im_start) & (
                 im_array[0].get_data() < im_end)
         elif (self.readOptions=="cached"):
             im_match_bool = (im_array > im_start) & (
                 im_array < im_end)
-        # TODO: Think about how to vectorize this for-loop. Done.
+        
         if spec.getMSLevel() == 1 and 1 in mslevel:
             mz_match_bool = (mz_array > target_precursor_mz_lower) & (
                 mz_array < target_precursor_mz_upper)
@@ -574,18 +547,10 @@ class TargeteddiaPASEFExperiment(data_io):
                 filtered_im_np = np.array(filtered_im).astype(np.float32)
                 fda.set_data(filtered_im_np)
                 fda.setName("Ion Mobility")
-                # TODO: There currently is an issue when setting float data array. Getting Float Data Array does not match input
                 spec.setFloatDataArrays([fda])
-                # Temp solution: Add string data of filtered ion mobility data
-                # TODO: Remove temp solution, since it is no longer needed.
-                sda = po.StringDataArray()
-                sda.setName("String Ion Mobility")
-                _ = [sda.push_back(str(im_val)) for im_val in filtered_im]
-                spec.setStringDataArrays([sda])
                 # Set peptide meta data
                 spec.setMetaValue(
                     'peptide', self.peptides[target_peptide_group]['peptide'])
-
                 precursor = po.Precursor()
                 precursor.setCharge(
                     self.peptides[target_peptide_group]['charge'])
@@ -617,8 +582,6 @@ class TargeteddiaPASEFExperiment(data_io):
         Return:
           if an output file is given, filtered data is written to disk, otherwise a filtered MSExperiment object is returned
         """
-        # # Load the data
-        # self.load_data()
 
         # Get Consumer to write filtered spectra to. Memory efficient
         if output_spectra_file is not None:
@@ -650,7 +613,6 @@ class TargeteddiaPASEFExperiment(data_io):
         pbar_desc = "INFO: Processing"
         for target_peptide_group in pbar:
             # Update progess bar description
-            # pbar_desc = pbar_desc + f"..\n{target_peptide_group}"
             pbar_desc = f"INFO: Processing..{target_peptide_group}"
             pbar.set_description(pbar_desc)
 

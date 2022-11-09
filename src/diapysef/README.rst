@@ -275,7 +275,8 @@ If you want to manually generate a peptide coordinate dictionary, it should look
                         'rt_boundaries': [1917.89404296875, 1953.622314453125]}
                 }
 
-**Note:** we separate peptide precursors
+**NOTE:** we create separate coordinates for peptide ion charge states. Each precursor ion (peptide of specific charge state), will have its own nested dictionary of target coordinate paramaters. 
+I.e. the peptide *T(UniMod:21)ELISVSEVHPSR* can have multiple charge states, and should be separated as *T(UniMod:21)ELISVSEVHPSR_2* and *T(UniMod:21)ELISVSEVHPSR_3* to indicated a charge 2 precursor and a charge 3 precursor respectively.
 
 Not all the values are necessary, however, the ones that are needed are: **peptide**, **precursor_mz**, **charge**, **rt_apex**, **im_apex**, **product_mz**.
 

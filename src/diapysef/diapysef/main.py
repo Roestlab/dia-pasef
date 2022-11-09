@@ -67,18 +67,6 @@ def targeted_extraction(infile, target_coordinates, outfile, mz_tol, rt_window, 
     else:
         raise AssertionError(
             f"Wrong input type ({target_coordinates}) for target coordinates (--coords)! Has to be a pickle file, see --help for example.")
-    # Debug
-    if False:
-        infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/PTMs_Project/synthetic_pool_timstoff/data/raw/IPP_M10_DIA-PaSEF_60min_Bruker10_400nL_1ul-inj-redo2_Slot2-25_1_2151.mzML"
-        target_coordinates = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/dia-pasef/src/diapysef/example/peptides_coord_ex.pkl"
-        mz_tol = 20
-        rt_window = 40
-        im_window = 0.06
-        verbose = 1
-        log_file = "diapasef_data_extraction.log"
-        mslevel = [1, 2]
-        threads = 1
-        readOptions="ondisk"
 
     exp = TargeteddiaPASEFExperiment(
         infile, peptides, mz_tol, rt_window, im_window, mslevel, readoptions, verbose, None, threads)
