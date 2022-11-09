@@ -8,7 +8,7 @@ desc = """\
 Analysis, conversion and visualization of diaPASEF data."""
 
 setup(name='diapysef',
-      version='0.3.5',
+      version='1.0.0',
       description=desc,
       long_description=readme(),
       url="https://github.com/Roestlab/dia-pasef",
