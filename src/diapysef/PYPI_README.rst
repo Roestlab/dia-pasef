@@ -24,25 +24,14 @@ If you wish to install from pyPI
 
     $ pip install diapysef
 
-.. raw:: html
-
-   <details class="Legacy">
-   <summary>Installing from source</summary>
-
 If you wish to install from source, you can do the following:
 
 .. code:: bash
 
     $python setup.py install
 
-.. raw:: html
 
-   </details>
-
-.. raw:: html
-
-   <details class="Legacy">
-   <summary>Legacy (version <= 0.3.5)</summary>
+Legacy (version <= 0.3.5)
 
 We have not uploaded this package to pyPI, since the package contains
 some small example data and small amounts of bruker code. You can
@@ -59,9 +48,6 @@ On windows make sure that you add the Scripts/ folder of your python
 installation to your PATH to be able to call the command line tools from
 anywhere.
 
-.. raw:: html
-
-   </details>
 
 Running diapysef
 =================
@@ -141,11 +127,6 @@ If you see an output like this:
 
 *diapysef* will attempt to install the appropriate sdk for your system to the current working directory. If this fails, you will have to manually install it yourself.
 
-.. raw:: html
-
-   <details>
-   <summary>Example Command</summary>
-
 .. code:: bash
 
     diapysef converttdftomzml --in IPP_U1_B10_60min_400nL_Slot1-10_1_1192_6-16-2021.d --out test_diapysef.mzML
@@ -156,14 +137,7 @@ If you see an output like this:
     100%|████████████████████████████████████████████████████████████████████████████| 38269/38269 [48:27<00:00, 13.16it/s]
     [2022-11-09 10:46:31] INFO: Finished converting TDF data to mzML!
 
-.. raw:: html
-
-   </details>
-
-.. raw:: html
-
-   <details class="Legacy">
-   <summary>Legacy (version <= 0.3.5)</summary>
+Legacy (version <= 0.3.5)
 
 Assuming you have added the python scripts folder to your path you can
 simply run:
@@ -196,9 +170,7 @@ of ProteoWizard which supports access to the bruker sdk.
                                [-m MERGE_SCANS] [-r FRAME_LIMIT FRAME_LIMIT]
     convertTDFtoMzML.py: error: the following arguments are required: -a/--analysis_dir, -o/--output_name
 
-.. raw:: html
 
-   </details>
 
 Targeted Data Extraction
 ========================
@@ -212,11 +184,6 @@ In order to extract a targeted region of the data, you need peptide coordinates 
 
     diapysef prepare-coordinates --help
 
-.. raw:: html
-
-   <details>
-   <summary>Example Command</summary>
-
 .. code:: bash
 
     diapysef prepare-coordinates --in merged.osw --out peptides_coord_ex.pkl --run_id 5500589384113116496 --target_peptides '["T(UniMod:21)ELISVSEVHPSR", "TELIS(UniMod:21)VSEVHPSR"]' 
@@ -229,14 +196,6 @@ In order to extract a targeted region of the data, you need peptide coordinates 
 
 **NOTE:** A *merged.osw* can be obtained by an OpenMS-OpenSwathWorkflow-PyProphet workflow. See [openswath.org](openswath.org) for information on how to perform an OpenSwathWorkflow.
 
-.. raw:: html
-
-   </details>
-
-.. raw:: html
-
-   <details>
-   <summary>Example Peptide Coordinate Python Dictionary</summary>
 
 If you want to manually generate a peptide coordinate dictionary, it should look something like the following:
 
@@ -293,9 +252,6 @@ You can save the dictionary to a pickle file using the following code:
     import pickle
     with open(f"peptides.pkl", "wb") as output_file: pickle.dump(peptides, file=output_file, )
 
-.. raw:: html
-
-   </details>
 
 Targeted Extraction of the Raw diaPASEF mzML data
 -------------------------------------------------
@@ -306,10 +262,6 @@ To reduce the raw diaPASEF data, for visualization or for preliminary algorithm 
 
     $ diapysef targeted-extraction --help
 
-.. raw:: html
-
-   <details>
-   <summary>Example Command</summary>
 
 .. code:: bash
 
@@ -322,16 +274,9 @@ To reduce the raw diaPASEF data, for visualization or for preliminary algorithm 
     INFO: Processing..TELIS(UniMod:21)VSEVHPSR_3: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [01:13<00:00, 24.35s/it]
     [2022-09-07 12:09:00] INFO: Finished extracting targeted spectra!
 
-.. raw:: html
-
-   </details>
 
 **NOTE:** You may get a speed performance boost if you use cached mzML files (files produced from OpenSwathWorflow when using *cacheWorkingInMemory*).
 
-.. raw:: html
-
-   <details>
-   <summary>Using Cache vs On Disk Speed Comparisons</summary>
 
 Cached spectra processing is now 10 fold faster than ondisk, using `hroest/OpenMS/tree/feature/drift_time_os_spec_2 <https://github.com/hroest/OpenMS/tree/feature/drift_time_os_spec_2>`_
 
@@ -365,9 +310,7 @@ Cached
     INFO: Processing..YVC(UniMod:4)EGPSHGGLPGAS(UniMod:21)SEK_3: 100%|███████████████████████████| 54/54 [00:21<00:00, 2.57it/s]
     [2022-09-30 13:41:32] INFO: Finished extracting targeted spectra!
 
-.. raw:: html
 
-   </details>
 
 Exporting reduced targeted mzML for easier data manipulation and plotting
 -------------------------------------------------------------------------
@@ -378,25 +321,17 @@ We can export the reduced mzML to a tsv file with m/z, retention time, ion mobil
 
     $ diapysef export --help
 
-.. raw:: html
 
-   <details>
-   <summary>Example Command</summary>
+.. code:: bash
 
-    .. code:: bash
+    $ diapysef export --in targed_data_extraction.mzML --out extracted_data.tsv --mslevel [1,2] --verbose 10 --log_file export.log
 
-        $ diapysef export --in targed_data_extraction.mzML --out extracted_data.tsv --mslevel [1,2] --verbose 10 --log_file export.log
+    Bruker sdk not found. Some functionalities that need access to raw data will not be available. To activate that functionality place libtimsdata.so (Linux) or timsdata.dll in the src folder. 
 
-        Bruker sdk not found. Some functionalities that need access to raw data will not be available. To activate that functionality place libtimsdata.so (Linux) or timsdata.dll in the src folder. 
+    [2022-09-07 12:09:34] INFO: Loading data...
+    100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 5460/5460 [00:00<00:00, 6816.65it/s]
+    [2022-09-07 12:09:36] INFO: Finished exporting data!
 
-        [2022-09-07 12:09:34] INFO: Loading data...
-        100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 5460/5460 [00:00<00:00, 6816.65it/s]
-        [2022-09-07 12:09:36] INFO: Finished exporting data!
-
-
-.. raw:: html
-
-   </details>
 
 Generating a report of RT and IM Heatmap plots
 ----------------------------------------------
@@ -406,11 +341,6 @@ We can generate a 2D heatmap of the data using the report module. The current im
 .. code:: bash
 
     $ diapysef report --help
-
-.. raw:: html
-
-   <details>
-   <summary>Example Command</summary>
 
 .. code:: bash
 
@@ -424,9 +354,6 @@ We can generate a 2D heatmap of the data using the report module. The current im
 
 .. image:: img/output_targeted_data_extraction_example.png
 
-.. raw:: html
-
-   </details>
 
 Data access and convenience functions
 =====================================
@@ -561,10 +488,6 @@ Docker image
 
 There is a docker image available on docker hub `singjust/modibik <https://hub.docker.com/r/singjust/mobidik>`_
 
-.. raw:: html
-
-   <details>
-   <summary>Useage</summary>
 
 .. code:: bash
 
@@ -590,6 +513,3 @@ There is a docker image available on docker hub `singjust/modibik <https://hub.d
     report               Generate a report for a specfific type of plot
     targeted-extraction  Extract from the raw data given a set of target...
 
-.. raw:: html
-
-   </details>
