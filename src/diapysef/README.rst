@@ -319,6 +319,49 @@ To reduce the raw diaPASEF data, for visualization or for preliminary algorithm 
 
    </details>
 
+**NOTE:** You may get a speed performance boost if you use cached mzML files (files produced from OpenSwathWorflow when using *cacheWorkingInMemory*).
+
+.. raw:: html
+
+   <details>
+   <summary>Using Cache vs On Disk Speed Comparisons</summary>
+
+Cached spectra processing is now 10 fold faster than ondisk, using `hroest/OpenMS/tree/feature/drift_time_os_spec_2 <https://github.com/hroest/OpenMS/tree/feature/drift_time_os_spec_2>`_
+
+.. image:: img/output_ondisk_vs_cache_example.png
+
+It also now only takes 21.0601 sec to reduce the spectra from cache, vs 74.5139 sec to reduce the spectra from ondisk
+
+On Disk Experiment
+~~~~~~~~~~~~~~~~~~
+
+.. code:: bash
+
+    diapysef targeted-extraction --in data/raw/IPP_M10_DIA-PaSEF_60min_Bruker10_400nL_1ul-inj-redo2_Slot2-25_1_2151_MS1.mzML --coords peptides.pkl --readOptions ondisk --verbose 1 --mslevel [1] --mz_tol 20 --rt_window 40 --im_window 0.08
+    Found Bruker sdk. Access to the raw data is possible.
+
+    [2022-09-30 13:18:20] INFO: Loading data...
+    [2022-09-30 13:20:34] INFO: Reducing spectra using targeted coordinates...
+    INFO: Processing..YVC(UniMod:4)EGPSHGGLPGAS(UniMod:21)SEK_3: 100%|███████████████████████████████████████████████████████████| 54/54 [01:14<00:00, 1.38s/it]
+    [2022-09-30 13:21:48] INFO: Finished extracting targeted spectra!
+
+Cached
+~~~~~~
+
+.. code:: bash
+
+    diapysef targeted-extraction --in data/raw/cached/20220928_171403_179508ef404e_1_1_ms1.mzML --coords peptides.pkl --readOptions cached --verbose 1 --mslevel [1] --mz_tol 20 --rt_window 40 --im_window 0.08
+    Found Bruker sdk. Access to the raw data is possible.
+
+    [2022-09-30 13:41:11] INFO: Loading data...
+    [2022-09-30 13:41:11] INFO: Reducing spectra using targeted coordinates...
+    INFO: Processing..YVC(UniMod:4)EGPSHGGLPGAS(UniMod:21)SEK_3: 100%|███████████████████████████| 54/54 [00:21<00:00, 2.57it/s]
+    [2022-09-30 13:41:32] INFO: Finished extracting targeted spectra!
+
+.. raw:: html
+
+   </details>
+
 Exporting reduced targeted mzML for easier data manipulation and plotting
 -------------------------------------------------------------------------
 
