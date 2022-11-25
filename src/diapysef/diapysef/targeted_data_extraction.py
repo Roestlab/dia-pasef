@@ -88,89 +88,120 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
                 f"Generating coordinates for the following peptides: {target_peptides}")
 
             sql_query = '''
-      SELECT 
-      PEPTIDE.MODIFIED_SEQUENCE AS peptide,
-      PRECURSOR.PRECURSOR_MZ AS precursor_mz,
-      PRECURSOR.CHARGE AS charge,
-      TRANSITION.PRODUCT_MZ AS product_mz,
-      TRANSITION.CHARGE AS product_charge,
-      TRANSITION.ANNOTATION AS product_annotation,
-      TRANSITION.DETECTING AS product_detecting,
-      FEATURE.EXP_RT AS rt_apex,
-      FEATURE.LEFT_WIDTH AS left_width,
-      FEATURE.RIGHT_WIDTH AS right_width,
-      FEATURE.EXP_IM AS im_apex,
-      SCORE_TABLE.QVALUE as qvalue
-      FROM PRECURSOR
-      INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-      INNER JOIN (
-        SELECT * 
-        FROM PEPTIDE
-        WHERE PEPTIDE.MODIFIED_SEQUENCE IN ("%s")
-        ) AS PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-      %s 
-      INNER JOIN (
-        SELECT *
-        FROM TRANSITION
-        WHERE TRANSITION.DETECTING in (%s)
-      ) AS TRANSITION ON TRANSITION.ID = %s
-      INNER JOIN (
-        SELECT *
-        FROM FEATURE
-        WHERE FEATURE.RUN_ID=%s
-      ) AS FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-      %s
-      ''' % ('","'.join(target_peptides), use_transition_map, detecting_col, join_on_transition_table_id, run_id, join_on_score_table )
+              SELECT
+              PEPTIDE.MODIFIED_SEQUENCE AS peptide,
+              PRECURSOR.PRECURSOR_MZ AS precursor_mz,
+              PRECURSOR.CHARGE AS charge,
+              TRANSITION.PRODUCT_MZ AS product_mz,
+              TRANSITION.CHARGE AS product_charge,
+              TRANSITION.ANNOTATION AS product_annotation,
+              TRANSITION.DETECTING AS product_detecting,
+              FEATURE.EXP_RT AS rt_apex,
+              FEATURE.LEFT_WIDTH AS left_width,
+              FEATURE.RIGHT_WIDTH AS right_width,
+              FEATURE.EXP_IM AS im_apex,
+              SCORE_TABLE.QVALUE as qvalue
+              FROM PRECURSOR
+              INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+              INNER JOIN (
+                SELECT * 
+                FROM PEPTIDE
+                WHERE PEPTIDE.MODIFIED_SEQUENCE IN ("%s")
+                ) AS PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
+              %s 
+              INNER JOIN (
+                SELECT *
+                FROM TRANSITION
+                WHERE TRANSITION.DETECTING in (%s)
+              ) AS TRANSITION ON TRANSITION.ID = %s
+              INNER JOIN (
+                SELECT *
+                FROM FEATURE
+                WHERE FEATURE.RUN_ID=%s
+              ) AS FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+              %s
+              ''' % ('","'.join(target_peptides), use_transition_map, detecting_col, join_on_transition_table_id, run_id, join_on_score_table )
+        else: # if targeted peptides is "None" than select all peptides
+            sql_query = '''
+              SELECT
+              PEPTIDE.MODIFIED_SEQUENCE AS peptide,
+              PRECURSOR.PRECURSOR_MZ AS precursor_mz,
+              PRECURSOR.CHARGE AS charge,
+              TRANSITION.PRODUCT_MZ AS product_mz,
+              TRANSITION.CHARGE AS product_charge,
+              TRANSITION.ANNOTATION AS product_annotation,
+              TRANSITION.DETECTING AS product_detecting,
+              FEATURE.EXP_RT AS rt_apex,
+              FEATURE.LEFT_WIDTH AS left_width,
+              FEATURE.RIGHT_WIDTH AS right_width,
+              FEATURE.EXP_IM AS im_apex,
+              SCORE_TABLE.QVALUE as qvalue
+              FROM PRECURSOR
+              INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+              INNER JOIN PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
+              %s
+              INNER JOIN (
+                SELECT *
+                FROM TRANSITION
+                WHERE TRANSITION.DETECTING in (%s)
+              ) AS TRANSITION ON TRANSITION.ID = %s
+              INNER JOIN (
+                SELECT *
+                FROM FEATURE
+                WHERE FEATURE.RUN_ID=%s
+              ) AS FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+              %s
+              ''' % (use_transition_map, detecting_col, join_on_transition_table_id, run_id, join_on_score_table )
 
-            if verbose == 10:
-                logging.debug(f"Injecting SQL Query:\n{sql_query}")
+        if verbose == 10:
+            logging.debug(f"Injecting SQL Query:\n{sql_query}")
 
-            data = pd.read_sql_query(sql_query, con)
-            
-            if data.shape[0]==0:
-                raise click.ClickException(
-                    f"ERROR: Seems like there were none of the target peptides {', '.join(target_peptides)} found in the input osw file {infile}!\n{data.to_string()}")
+        data = pd.read_sql_query(sql_query, con)
+        
+        if data.shape[0]==0:
+            raise click.ClickException(
+                f"ERROR: Seems like there were none of the target peptides {', '.join(target_peptides)} found in the input osw file {infile}!\n{data.to_string()}")
 
 
-            data['group_id'] = data['peptide'] + \
-                '_' + data['charge'].astype(str)
+        data['group_id'] = data['peptide'] + \
+            '_' + data['charge'].astype(str)
 
-            # Only keep the best scoring feature per group_id
-            data = data.loc[data.groupby('group_id')['qvalue'].transform(
-                'min').eq(data['qvalue'])].reset_index(drop=True)
+        # Only keep the best scoring feature per group_id
+        data = data.loc[data.groupby('group_id')['qvalue'].transform(
+            'min').eq(data['qvalue'])].reset_index(drop=True)
 
-            # Group and aggregate product m/z into a list
-            agg_product_mz_df = data.groupby(['group_id'])['product_mz'].apply(
-                list).to_frame().reset_index()
-            data = pd.merge(data.drop('product_mz', axis=1),
-                            agg_product_mz_df, on=['group_id'])
-            # Group and aggregate product charge into a list
-            agg_product_charge_df = data.groupby(['group_id'])['product_charge'].apply(
-                list).to_frame().reset_index()
-            data = pd.merge(data.drop('product_charge', axis=1),
-                            agg_product_charge_df, on=['group_id'])
-            # Group and aggregate product annotation into a list
-            agg_product_annotation_df = data.groupby(['group_id'])['product_annotation'].apply(
-                list).to_frame().reset_index()
-            data = pd.merge(data.drop('product_annotation', axis=1),
-                            agg_product_annotation_df, on=['group_id'])
-            # Group and aggregate product detecting into a list
-            agg_product_detecting_df = data.groupby(['group_id'])['product_detecting'].apply(
-                list).to_frame().reset_index()
-            data = pd.merge(data.drop('product_detecting', axis=1),
-                            agg_product_detecting_df, on=['group_id'])
+        # Group and aggregate product m/z into a list
+        agg_product_mz_df = data.groupby(['group_id'])['product_mz'].apply(
+            list).to_frame().reset_index()
+        data = pd.merge(data.drop('product_mz', axis=1),
+                        agg_product_mz_df, on=['group_id'])
+        # Group and aggregate product charge into a list
+        agg_product_charge_df = data.groupby(['group_id'])['product_charge'].apply(
+            list).to_frame().reset_index()
+        data = pd.merge(data.drop('product_charge', axis=1),
+                        agg_product_charge_df, on=['group_id'])
+        # Group and aggregate product annotation into a list
+        agg_product_annotation_df = data.groupby(['group_id'])['product_annotation'].apply(
+            list).to_frame().reset_index()
+        data = pd.merge(data.drop('product_annotation', axis=1),
+                        agg_product_annotation_df, on=['group_id'])
+        # Group and aggregate product detecting into a list
+        agg_product_detecting_df = data.groupby(['group_id'])['product_detecting'].apply(
+            list).to_frame().reset_index()
+        data = pd.merge(data.drop('product_detecting', axis=1),
+                        agg_product_detecting_df, on=['group_id'])
 
-            # Aggegate left and right bounaries into a list
-            data['rt_boundaries'] = data[[
-                'left_width', 'right_width']].values.tolist()
-            data.drop(['left_width', 'right_width'], axis=1, inplace=True)
+        # Aggegate left and right bounaries into a list
+        data['rt_boundaries'] = data[[
+            'left_width', 'right_width']].values.tolist()
+        data.drop(['left_width', 'right_width'], axis=1, inplace=True)
 
-            # Melt dataframe to long format
-            data_long = data.melt(id_vars=['group_id'])
+        # Melt dataframe to long format
+        data_long = data.melt(id_vars=['group_id'])
 
-            # Generate nested dictionary of targeted peptide coordinates
-            peptide_coordinates_dict = data_long.groupby(
-                'group_id')[['variable', 'value']].apply(lambda x: dict(x.to_numpy())).to_dict()
+        # Generate nested dictionary of targeted peptide coordinates
+        peptide_coordinates_dict = data_long.groupby(
+            'group_id')[['variable', 'value']].apply(lambda x: dict(x.to_numpy())).to_dict()
 
         # Close connection
         con.close()
