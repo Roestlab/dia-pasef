@@ -1,1 +1,2 @@
-* [2022-11-09] - Figure out how to update package on pyPI. Currently the version on pyPI is 0.3.5
+* ~~[2022-11-09] - Figure out how to update package on pyPI. Currently the version on pyPI is 0.3.5~~ Done.
+* [2022-11-25] - Look into examples of peptides in two pasef windows, how does the data extraction module handle this?
