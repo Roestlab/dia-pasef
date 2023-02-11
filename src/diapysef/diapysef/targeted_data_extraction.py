@@ -260,7 +260,7 @@ class data_io():
             self.filtered = exp
         else:
             if self.readOptions=="ondisk":
-                # TODO: For some reason the OnDiscExperiment doesn't read StringMetaData, which is currecntly used to store filtered IM data
+                # TODO: For some reason the OnDiscExperiment doesn't read StringMetaData, which is currecntly used to store filtered IM data. This should no longer be an issue..
                 with code_block_timer('Creating OnDiscExperiment...', logging.debug):
                     exp = po.OnDiscMSExperiment()
 
@@ -378,7 +378,19 @@ class data_io():
                     logging.debug(
                         f"Adding MS{spec.getMSLevel()} spectrum for peptide: {spec.getMetaValue('peptide')} with native id: {spec.getNativeID()}")
                 add_df = pd.DataFrame({'native_id': spec.getNativeID(), 'ms_level': spec.getMSLevel(), 'peptide': spec.getMetaValue(
-                    'peptide'), 'precursor_mz': precursor.getMZ(), 'charge': precursor.getCharge(), 'mz': mz, 'rt': rt, 'im': im, 'int': intensity})
+                    'peptide'), 'precursor_mz': spec.getMetaValue('precursor_mz'), 'charge': precursor.getCharge(), 'mz': mz, 'rt': rt, 'im': im, 'int': intensity})
+                ## Add additional meta data
+                meta_data = pd.DataFrame()
+                if spec.getMetaValue('rt_apex') is not None:
+                    meta_data['rt_apex'] = pd.Series(spec.getMetaValue('rt_apex'))
+                if spec.getMetaValue('im_apex') is not None:
+                    meta_data['im_apex'] = pd.Series(spec.getMetaValue('im_apex'))
+                if spec.getMetaValue('rt_left_width') is not None:
+                    meta_data['rt_left_width'] = pd.Series(spec.getMetaValue('rt_left_width'))    
+                if spec.getMetaValue('rt_right_width') is not None:
+                    meta_data['rt_right_width'] = pd.Series(spec.getMetaValue('rt_right_width'))
+                if not meta_data.empty:
+                    add_df = add_df.join(meta_data, how='cross')
                 results_df = pd.concat([results_df, add_df])
         logging.info(
             f"Saving filtered target spectra data to tabular tsv format: {out_file}")
@@ -503,7 +515,7 @@ class TargeteddiaPASEFExperiment(data_io):
         return any([check_mz >= bounds[0] and check_mz <= bounds[1] for bounds in target_product_upper_lower_list])
 
     # @wrap_non_picklable_objects # seems to cause an error with spectrum. list not having attribute getRT()
-    def filter_single_spectrum(self, spec_indice, mslevel, target_peptide_group, rt_start, rt_end, im_start, im_end, target_precursor_mz_lower, target_precursor_mz_upper, target_product_upper_lower_list, verbose=0):
+    def filter_single_spectrum(self, spec_indice, mslevel, target_peptide_group, rt_start, rt_end, im_start, im_end, target_precursor_mz, target_precursor_mz_lower, target_precursor_mz_upper, target_product_upper_lower_list, verbose=0):
         """
         Filter a single spectrum for a given spectrum indice.
 
@@ -541,6 +553,13 @@ class TargeteddiaPASEFExperiment(data_io):
         else:
             click.ClickException(f"ERROR: Unknown readOptions ({self.readOptions}) given! Has to be one of 'ondisk', 'cached'")
         
+        # Get SWATH windows upper and lower
+        dir(spec)
+        current_prec = spec.getPrecursors()[0]
+        dir(current_prec)
+        swath_mz_win_lower = current_prec.getMZ() - current_prec.getIsolationWindowLowerOffset()
+        swath_mz_win_upper = current_prec.getMZ() + current_prec.getIsolationWindowUpperOffset()
+
         if (self.readOptions=="ondisk"): # TODO: Can we get rid of these annoying if statement checks? I guess we do this because in ondisk exp we need the get_data view
             im_match_bool = (im_array[0].get_data() > im_start) & (
                 im_array[0].get_data() < im_end)
@@ -555,11 +574,18 @@ class TargeteddiaPASEFExperiment(data_io):
                 logging.debug(
                     f"Adding MS1 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_precursor_mz_lower} m/z and {target_precursor_mz_upper} m/z and IM between {im_start} and {im_end}")
         elif spec.getMSLevel() == 2 and 2 in mslevel:
-            mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(
-                target_product_upper_lower_list, len(mz_array)))))
-            if verbose == 10 and any(mz_match_bool*im_match_bool):
-                logging.debug(
-                    f"Adding MS2 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_product_upper_lower_list} m/z and IM between {im_start} and {im_end}")
+            # Only extract product spectra if current spectrums isolation window contains precursor mz
+            if target_precursor_mz > swath_mz_win_lower and target_precursor_mz < swath_mz_win_upper:
+                mz_match_bool = np.array(list(map(self.is_mz_in_product_mz_tol_window, mz_array, itertools.repeat(
+                    target_product_upper_lower_list, len(mz_array)))))
+                if verbose == 10 and any(mz_match_bool*im_match_bool):
+                    logging.debug(
+                        f"Adding MS2 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} filtered for {sum(mz_match_bool*im_match_bool)} spectra between {target_product_upper_lower_list} m/z and IM between {im_start} and {im_end}")
+            else:
+                mz_match_bool = np.zeros(mz_array.shape).astype(bool)
+                if verbose == 10:
+                    logging.debug(
+                        f"Skipping MS2 spectrum {spec.getNativeID()} with spectrum indice {spec_indice} because current swath isolation window ({swath_mz_win_lower} m/z - {swath_mz_win_upper} m/z) does not contain target precursor m/z ({target_precursor_mz})")
         # Only write out filtered spectra if there is any fitlered spectra to write out
         if any(mz_match_bool*im_match_bool):
             with code_block_timer(f'Getting filtered spectrum...', logging.debug):
@@ -582,17 +608,34 @@ class TargeteddiaPASEFExperiment(data_io):
                 # Set peptide meta data
                 spec.setMetaValue(
                     'peptide', self.peptides[target_peptide_group]['peptide'])
+                spec.setMetaValue(
+                    'precursor_mz', self.peptides[target_peptide_group]['precursor_mz'])    
+                [spec.setMetaValue(f'product_mz_{i}', mz) for i, mz in zip(range(0, len(self.peptides[target_peptide_group]['product_mz'])), self.peptides[target_peptide_group]['product_mz'])]
+                if 'rt_apex' in self.peptides[target_peptide_group].keys():
+                    spec.setMetaValue(
+                    'rt_apex', self.peptides[target_peptide_group]['rt_apex'])
+                if 'im_apex' in self.peptides[target_peptide_group].keys():
+                    spec.setMetaValue(
+                    'im_apex', self.peptides[target_peptide_group]['im_apex'])
+                if 'rt_boundaries' in self.peptides[target_peptide_group].keys():
+                    spec.setMetaValue(
+                    'rt_left_width', self.peptides[target_peptide_group]['rt_boundaries'][0])
+                    spec.setMetaValue(
+                    'rt_right_width', self.peptides[target_peptide_group]['rt_boundaries'][1])
                 precursor = po.Precursor()
                 precursor.setCharge(
                     self.peptides[target_peptide_group]['charge'])
                 precursor.setMZ(
-                    self.peptides[target_peptide_group]['precursor_mz'])
+                    current_prec.getMZ())
+                precursor.setIsolationWindowLowerOffset(current_prec.getIsolationWindowLowerOffset())
+                precursor.setIsolationWindowUpperOffset(current_prec.getIsolationWindowUpperOffset())
                 spec.setPrecursors([precursor])
-
+                
                 # Set Prodcut mz values
-                spec.setProducts([self.set_product(
-                    mz, ) for mz in self.peptides[target_peptide_group]['product_mz']])
-
+                # Probably don't need to set products, since we use metaValue instead now.
+                # spec.setProducts([self.set_product(
+                    # mz, ) for mz in self.peptides[target_peptide_group]['product_mz']])
+            
             # Write out filtered spectra to file if consumer present. This is more memory efficient
             # TODO: Once paralization works, will need to think about how writing to consumer will be affected
             if self.consumer is not None:
@@ -682,7 +725,7 @@ class TargeteddiaPASEFExperiment(data_io):
                     #   File "stringsource", line 2, in pyopenms.pyopenms_1.MSSpectrum.__reduce_cython__
                     # TypeError: self.inst cannot be converted to a Python object for pickling
                     # TODO: Currently very memory heavy, maybe save filtered spectrums to disk? Done.
-                    filt_spec_list = Parallel(n_jobs=1)(delayed(self.filter_single_spectrum)(spectrum_indice, self.mslevel, target_peptide_group, rt_start, rt_end, im_start, im_end,
+                    filt_spec_list = Parallel(n_jobs=1)(delayed(self.filter_single_spectrum)(spectrum_indice, self.mslevel, target_peptide_group, rt_start, rt_end, im_start, im_end, target_precursor_mz,
                                                                                              target_precursor_mz_lower, target_precursor_mz_upper, target_product_upper_lower_list, self.verbose) for spectrum_indice in target_spectra_indices.tolist())
                 except:
                     traceback.print_exc(file=sys.stdout)
