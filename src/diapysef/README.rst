@@ -381,9 +381,10 @@ We can export the reduced mzML to a tsv file with m/z, retention time, ion mobil
 .. raw:: html
 
    <details>
+   
    <summary>Example Command</summary>
 
-    .. code:: bash
+.. code:: bash
 
         $ diapysef export --in targed_data_extraction.mzML --out extracted_data.tsv --mslevel [1,2] --verbose 10 --log_file export.log
 
