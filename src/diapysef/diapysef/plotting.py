@@ -537,7 +537,7 @@ class two_dimension_plotter:
     if self.labelled_mask is not None:
       unique_feature_labels = np.unique(self.labelled_mask[self.labelled_mask!=0])
       palette = sns.color_palette("Dark2", len(unique_feature_labels))
-      
+      twod_quant_str = ""
       for label, col in zip(unique_feature_labels, palette):
         tmp_mask = np.array(self.labelled_mask==label).astype(np.uint8)
         # blur mask to try help generate better contours.
@@ -548,24 +548,47 @@ class two_dimension_plotter:
         xs = [self.rt_arr[v[0][0]] for v in contour]
         ys = [self.im_arr[(v[0][1])] for v in contour]
         main_plot.plot(xs, ys, color=col, linewidth=3)
+        tmp_arr_feature = np.zeros(self.arr.shape)
+        tmp_arr_feature[tmp_mask.astype(bool)] = self.arr[tmp_mask.astype(bool)]
+        y, x = np.unravel_index(np.argmax(tmp_arr_feature, axis=None), self.arr.shape)
+        main_plot.text(self.rt_arr[x], self.im_arr[y], str(int(label)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
+        if twod_quant_str=="":
+          twod_quant_str = f"F{label} Int: {np.round(np.sum(tmp_arr_feature))}"
+        else:
+          twod_quant_str = twod_quant_str + "\n" + f"F{label} Int: {np.round(np.sum(tmp_arr_feature))}"
+      at = AnchoredText(twod_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
+      at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+      main_plot.add_artist(at)
     main_plot.set_xlabel('Retention Time (s)')
     main_plot.set_ylabel('Ion Mobility')
     
     # one dimension arr 1
-    xic_plot.plot(self.rt_arr, np.mean(self.arr, axis=0))
+    xic_plot.plot(self.rt_arr, np.sum(self.arr, axis=0))
     if self.pep_coord is not None and self.using_rt_shape_indexes:
-      xic_plot.vlines(self.pep_coord['rt_boundaries'][0], ymin=0, ymax=np.max(np.mean(self.arr, axis=0)), color="r")
-      xic_plot.vlines(self.pep_coord['rt_boundaries'][1], ymin=0, ymax=np.max(np.mean(self.arr, axis=0)), color="r")
-      xic_plot.plot(self.pep_coord['rt_apex'], np.max(np.mean(self.arr, axis=0)), 'x')
+      xic_plot.vlines(self.pep_coord['rt_boundaries'][0], ymin=0, ymax=np.max(np.sum(self.arr, axis=0)), color="r")
+      xic_plot.vlines(self.pep_coord['rt_boundaries'][1], ymin=0, ymax=np.max(np.sum(self.arr, axis=0)), color="r")
+      xic_plot.plot(self.pep_coord['rt_apex'], np.max(np.sum(self.arr, axis=0)), 'x')
+      # Add Summed Intensity
+      left_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][0]))
+      right_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][1]))
+      oned_quant_str = r"$\sum_{i=left}^{right} Int$: " + f"{np.round(np.sum(np.mean(self.arr, axis=0)[left_index:right_index]))}"
+      oned_quant_str = oned_quant_str + f"\n Apex Int: {np.round(np.max(np.sum(self.arr, axis=0)))}"
+      at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
+      at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+      xic_plot.add_artist(at)
     xic_plot.tick_params(bottom=False, labelbottom=False)
-    xic_plot.set_ylabel('Mean Intensity')
+    xic_plot.set_ylabel('Summed Intensity')
     
     # one dimension arr 2
-    xim_plot.plot(np.mean(self.arr, axis=1), self.im_arr)
+    xim_plot.plot(np.sum(self.arr, axis=1), self.im_arr)
     if self.pep_coord is not None and self.using_im_shape_indexes:
-      xim_plot.plot(np.max(np.mean(self.arr, axis=1)), self.pep_coord['im_apex'], 'x')
+      xim_plot.plot(np.max(np.sum(self.arr, axis=1)), self.pep_coord['im_apex'], 'x')
+      oned_quant_str = f"Apex Int: {np.round(np.max(np.sum(self.arr, axis=1)))}"
+      at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper right')
+      at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+      xim_plot.add_artist(at)
     xim_plot.tick_params(left=False, labelleft=False)
-    xim_plot.set_xlabel('Mean Intensity')
+    xim_plot.set_xlabel('Summed Intensity')
     
     # Add color bar
     self.fig.colorbar(main_plot_img, cax=cbar_ax)
