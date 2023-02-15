@@ -503,6 +503,7 @@ class two_dimension_plotter:
     self.rt_arr = rt_arr
     self.pep_coord = pep_coord
     self.labelled_mask = labelled_mask
+    self.precursor_id = precursor_id
     self.fname = fname
     self.print_plot = print_plot
     
@@ -518,10 +519,10 @@ class two_dimension_plotter:
     gs = gridspec.GridSpec(3, 3)
     if self.pep_coord is not None and 'decoy' in self.pep_coord.keys():
       self.fig.suptitle(f"{self.pep_coord['peptide']}_{self.pep_coord['charge']}_(decoy={self.pep_coord['decoy']})")
-    elif pep_coord is not None:
+    elif self.pep_coord is not None:
       self.fig.suptitle(f"{self.pep_coord['peptide']}_{self.pep_coord['charge']}")
-    elif precursor_id is not None:
-      self.fig.suptitle(precursor_id)
+    elif self.precursor_id is not None:
+      self.fig.suptitle(self.precursor_id)
     self.fig.set_tight_layout(True)
     
     # Set gridspace
@@ -544,8 +545,8 @@ class two_dimension_plotter:
         contours, _  = cv2.findContours(tmp_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         contour = contours[0]
         M = cv2.moments(contour)
-        xs = [rt_arr[v[0][0]] for v in contour]
-        ys = [im_arr[(v[0][1])] for v in contour]
+        xs = [self.rt_arr[v[0][0]] for v in contour]
+        ys = [self.im_arr[(v[0][1])] for v in contour]
         main_plot.plot(xs, ys, color=col, linewidth=3)
     main_plot.set_xlabel('Retention Time (s)')
     main_plot.set_ylabel('Ion Mobility')
