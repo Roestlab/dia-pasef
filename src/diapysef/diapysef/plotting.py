@@ -553,9 +553,9 @@ class two_dimension_plotter:
         y, x = np.unravel_index(np.argmax(tmp_arr_feature, axis=None), self.arr.shape)
         main_plot.text(self.rt_arr[x], self.im_arr[y], str(int(label)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
         if twod_quant_str=="":
-          twod_quant_str = f"F{label} Int: {np.round(np.sum(tmp_arr_feature))}"
+          twod_quant_str = f"F{label} Int: {np.round(np.sum(tmp_arr_feature)):,}"
         else:
-          twod_quant_str = twod_quant_str + "\n" + f"F{label} Int: {np.round(np.sum(tmp_arr_feature))}"
+          twod_quant_str = twod_quant_str + "\n" + f"F{label} Int: {np.round(np.sum(tmp_arr_feature)):,}"
       at = AnchoredText(twod_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
       at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
       main_plot.add_artist(at)
@@ -564,15 +564,15 @@ class two_dimension_plotter:
     
     # one dimension arr 1
     xic_plot.plot(self.rt_arr, np.sum(self.arr, axis=0))
-    if self.pep_coord is not None and self.using_rt_shape_indexes:
+    if self.pep_coord is not None and not self.using_rt_shape_indexes:
       xic_plot.vlines(self.pep_coord['rt_boundaries'][0], ymin=0, ymax=np.max(np.sum(self.arr, axis=0)), color="r")
       xic_plot.vlines(self.pep_coord['rt_boundaries'][1], ymin=0, ymax=np.max(np.sum(self.arr, axis=0)), color="r")
       xic_plot.plot(self.pep_coord['rt_apex'], np.max(np.sum(self.arr, axis=0)), 'x')
       # Add Summed Intensity
       left_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][0]))
       right_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][1]))
-      oned_quant_str = r"$\sum_{i=left}^{right} Int$: " + f"{np.round(np.sum(np.mean(self.arr, axis=0)[left_index:right_index]))}"
-      oned_quant_str = oned_quant_str + f"\n Apex Int: {np.round(np.max(np.sum(self.arr, axis=0)))}"
+      oned_quant_str = r"$\sum_{i=left}^{right} Int$: " + f"{np.round(np.sum(np.sum(self.arr, axis=0)[left_index:right_index])):,}"
+      oned_quant_str = oned_quant_str + f"\n Apex Int: {np.round(np.max(np.sum(self.arr, axis=0))):,}"
       at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
       at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
       xic_plot.add_artist(at)
@@ -581,9 +581,9 @@ class two_dimension_plotter:
     
     # one dimension arr 2
     xim_plot.plot(np.sum(self.arr, axis=1), self.im_arr)
-    if self.pep_coord is not None and self.using_im_shape_indexes:
+    if self.pep_coord is not None and not self.using_im_shape_indexes:
       xim_plot.plot(np.max(np.sum(self.arr, axis=1)), self.pep_coord['im_apex'], 'x')
-      oned_quant_str = f"Apex Int: {np.round(np.max(np.sum(self.arr, axis=1)))}"
+      oned_quant_str = f"Apex Int: {np.round(np.max(np.sum(self.arr, axis=1))):,}"
       at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper right')
       at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
       xim_plot.add_artist(at)
