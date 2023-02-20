@@ -22,7 +22,7 @@ import pickle as pkl
 from joblib import Parallel, delayed, wrap_non_picklable_objects
 
 
-def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None, m_score=0.05, use_transition_peptide_mapping=False, use_only_detecting_transitions=True, verbose=0):
+def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None, m_score=0.05, use_transition_peptide_mapping=False, use_only_detecting_transitions=True, verbose=0, log_file=None):
     """
     Generate a dictionary of target coordinates to extract from Raw diaPASEF mzML data
 
@@ -32,6 +32,10 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
     Returns:
       a pickle file containing a dictionary of target coordinates
     """
+
+    # Initialise logger
+    if log_file is not None:
+        setup_logger(log_file, verbose)
 
     if infile.lower().endswith("osw"):
         if verbose == 10:
@@ -56,6 +60,22 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
         elif check_sqlite_table(con, "SCORE_MS2"):
             # Restrict to top peak group rank to generate coordinates for. We also filter based on MS2 QVALUE to reduce the number of peptides to generate coordinates for
             join_on_score_table = "INNER JOIN (SELECT * FROM SCORE_MS2 WHERE RANK ==1 AND QVALUE < %s) AS SCORE_TABLE ON SCORE_TABLE.FEATURE_ID = FEATURE.ID" % (m_score)
+
+        # MS1 Feature Identificaion
+        if check_sqlite_table(con, "FEATURE_MS1"):
+            join_on_feature_ms1_table = "INNER JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID"
+            select_feature_ms1_stmt = "FEATURE_MS1.AREA_INTENSITY AS ms1_intensity,"
+        else:
+            join_on_feature_ms1_table = ""
+            select_feature_ms1_stmt = ""
+
+        # MS2 Feature Identificaion
+        if check_sqlite_table(con, "FEATURE_MS2"):
+            join_on_feature_ms2_table = "INNER JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID"
+            select_feature_ms2_stmt = "FEATURE_MS2.AREA_INTENSITY AS intensity,"
+        else:
+            join_on_feature_ms2_table = ""
+            select_feature_ms2_stmt = ""
 
         # Get Run ID information
         run_ids_df = pd.read_sql_query("SELECT * FROM RUN", con)
@@ -87,7 +107,7 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
             logging.info(
                 f"Generating coordinates for the following peptides: {target_peptides}")
 
-            sql_query = '''
+            sql_query = f'''
               SELECT
               PEPTIDE.MODIFIED_SEQUENCE AS peptide,
               PRECURSOR.PRECURSOR_MZ AS precursor_mz,
@@ -100,29 +120,34 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
               FEATURE.LEFT_WIDTH AS left_width,
               FEATURE.RIGHT_WIDTH AS right_width,
               FEATURE.EXP_IM AS im_apex,
-              SCORE_TABLE.QVALUE as qvalue
+              {select_feature_ms1_stmt}
+              {select_feature_ms2_stmt}
+              SCORE_TABLE.QVALUE as qvalue,
+              PRECURSOR.DECOY as decoy
               FROM PRECURSOR
               INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
               INNER JOIN (
                 SELECT * 
                 FROM PEPTIDE
-                WHERE PEPTIDE.MODIFIED_SEQUENCE IN ("%s")
+                WHERE PEPTIDE.MODIFIED_SEQUENCE IN ("{'","'.join(target_peptides)}")
                 ) AS PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-              %s 
+              {use_transition_map} 
               INNER JOIN (
                 SELECT *
                 FROM TRANSITION
-                WHERE TRANSITION.DETECTING in (%s)
-              ) AS TRANSITION ON TRANSITION.ID = %s
+                WHERE TRANSITION.DETECTING in ({detecting_col})
+              ) AS TRANSITION ON TRANSITION.ID = {join_on_transition_table_id}
               INNER JOIN (
                 SELECT *
                 FROM FEATURE
-                WHERE FEATURE.RUN_ID=%s
+                WHERE FEATURE.RUN_ID={run_id}
               ) AS FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-              %s
-              ''' % ('","'.join(target_peptides), use_transition_map, detecting_col, join_on_transition_table_id, run_id, join_on_score_table )
+              {join_on_feature_ms1_table}
+              {join_on_feature_ms2_table}
+              {join_on_score_table}
+              ''' 
         else: # if targeted peptides is "None" than select all peptides
-            sql_query = '''
+            sql_query = f'''
               SELECT
               PEPTIDE.MODIFIED_SEQUENCE AS peptide,
               PRECURSOR.PRECURSOR_MZ AS precursor_mz,
@@ -135,23 +160,28 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
               FEATURE.LEFT_WIDTH AS left_width,
               FEATURE.RIGHT_WIDTH AS right_width,
               FEATURE.EXP_IM AS im_apex,
-              SCORE_TABLE.QVALUE as qvalue
+              {select_feature_ms1_stmt}
+              {select_feature_ms2_stmt}
+              SCORE_TABLE.QVALUE as qvalue,
+              PRECURSOR.DECOY as decoy
               FROM PRECURSOR
               INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
               INNER JOIN PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-              %s
+              {use_transition_map}
               INNER JOIN (
                 SELECT *
                 FROM TRANSITION
-                WHERE TRANSITION.DETECTING in (%s)
-              ) AS TRANSITION ON TRANSITION.ID = %s
+                WHERE TRANSITION.DETECTING in ({detecting_col})
+              ) AS TRANSITION ON TRANSITION.ID = {join_on_transition_table_id}
               INNER JOIN (
                 SELECT *
                 FROM FEATURE
-                WHERE FEATURE.RUN_ID=%s
+                WHERE FEATURE.RUN_ID={run_id}
               ) AS FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-              %s
-              ''' % (use_transition_map, detecting_col, join_on_transition_table_id, run_id, join_on_score_table )
+              {join_on_feature_ms1_table}
+              {join_on_feature_ms2_table}
+              {join_on_score_table}
+              '''
 
         if verbose == 10:
             logging.debug(f"Injecting SQL Query:\n{sql_query}")
