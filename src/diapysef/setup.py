@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 def readme():
     with open('PYPI_README.rst') as f:
@@ -8,12 +8,12 @@ desc = """\
 Analysis, conversion and visualization of diaPASEF data."""
 
 setup(name='diapysef',
-      version='1.0.04',
+      version='1.0.05',
       description=desc,
       long_description=readme(),
       long_description_content_type='text/x-rst',
       url="https://github.com/Roestlab/dia-pasef",
-      author='Max Frank, Annie Ha, Hannes Roest',
+      author='Max Frank, Annie Ha, Justin Sing, Josh Charkow, Hannes Roest',
       author_email='hannes.rost@utoronto.ca',
       license='MIT',
       packages=['diapysef'],
@@ -28,8 +28,10 @@ setup(name='diapysef',
           'joblib',
           'click'],
       package_data={
-          'diapysef': ['data/*']
+          'diapysef': ['data/*'],
+          '': ['PYPI_README.rst']
       },
+      include_package_data=True,
       entry_points={
           'console_scripts': [
               "diapysef=diapysef.main:cli",
