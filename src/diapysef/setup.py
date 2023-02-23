@@ -1,14 +1,14 @@
 from setuptools import setup
 
 def readme():
-    with open('PYPI_README.rst') as f:
+    with open('README.rst') as f:
         return f.read()
 
 desc = """\
 Analysis, conversion and visualization of diaPASEF data."""
 
 setup(name='diapysef',
-      version='1.0.03',
+      version='1.0.04',
       description=desc,
       long_description=readme(),
       url="https://github.com/Roestlab/dia-pasef",
