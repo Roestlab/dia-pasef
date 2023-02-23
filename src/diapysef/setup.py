@@ -1,7 +1,7 @@
 from setuptools import setup
 
 def readme():
-    with open('README.rst') as f:
+    with open('PYPI_README.rst') as f:
         return f.read()
 
 desc = """\
@@ -11,6 +11,7 @@ setup(name='diapysef',
       version='1.0.04',
       description=desc,
       long_description=readme(),
+      long_description_content_type='text/x-rst',
       url="https://github.com/Roestlab/dia-pasef",
       author='Max Frank, Annie Ha, Hannes Roest',
       author_email='hannes.rost@utoronto.ca',
