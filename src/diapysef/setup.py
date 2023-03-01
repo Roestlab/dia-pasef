@@ -8,7 +8,7 @@ desc = """\
 Analysis, conversion and visualization of diaPASEF data."""
 
 setup(name='diapysef',
-      version='1.0.05',
+      version='1.0.07',
       description=desc,
       long_description=readme(),
       long_description_content_type='text/x-rst',
