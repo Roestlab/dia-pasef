@@ -500,8 +500,7 @@ class TargeteddiaPASEFExperiment(data_io):
         Return: 
           (tuple) a tuple of the lower and upper bound for target mz
         """
-        # mz_uncertainty = target_mz*(self.mz_tol/(2*1000000))
-        mz_uncertainty = target_mz*(self.mz_tol/(1000000))
+        mz_uncertainty = target_mz * self.mz_tol / 2.0 * 1.0e-6
         target_precursor_mz_upper = target_mz + mz_uncertainty
         target_precursor_mz_lower = target_mz - mz_uncertainty
         return target_precursor_mz_lower, target_precursor_mz_upper
