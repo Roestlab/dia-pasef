@@ -455,7 +455,7 @@ class two_dimension_plotter:
       twod_quant_str = ""
       for label, col in zip(unique_feature_labels, palette):
         tmp_mask = np.array(self.labelled_mask==label).astype(np.uint8)
-        if cv is None:
+        if cv is not None:
             # blur mask to try help generate better contours.
             ## TODO: Blur makes small labels all 0
             tmp_mask_blur = cv.medianBlur(tmp_mask, 5)
