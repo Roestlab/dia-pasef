@@ -16,12 +16,15 @@ from tqdm import tqdm
 # Logging
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
-from pyopenms import *
+import pyopenms as po
 from scipy.signal import savgol_filter
-import cv2
+try:
+  import cv2 as cv
+except ImportError:
+  cv = None
 
 from scipy.signal import find_peaks, peak_widths
-# from two_dimension_gradient_ascent_peak_finder import get_one_dimension_peaks
+
 
 # Plotting
 matplotlib.use('Agg')
@@ -253,8 +256,7 @@ def plot_2d_qaunt_results_check(arr: np.array, arr_blur: np.array, i: list, j: l
     fig.savefig(fname, dpi=fig.dpi)
 
 def plot_2d_qaunt_results_check_watershed(arr, arr_blur, im_arr, rt_arr, im_prominence, rt_prominence, pep_coord, mask, label_mask, i, j, fname: str="2D_Quantification_check.png", print_plot: bool=False):
-
-    
+   
     
     plt.close("all")
     fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3,2, figsize=(10, 15), sharex=False, sharey=False)
@@ -350,18 +352,21 @@ def plot_2d_qaunt_results_check_watershed(arr, arr_blur, im_arr, rt_arr, im_prom
     # Labeled data
     ax6.imshow(arr, aspect='auto', cmap="afmhot_r", extent=[np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
     
-    for label, col in zip(unique_feature_labels, palette):
-        # ax5.scatter(rt_arr[np.where(label_mask==label)[1]], im_arr[np.where(label_mask==label)[0]],color=col, s=15, alpha=0.6)
-        contours, _  = cv2.findContours(np.array(label_mask==label).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        contour = contours[0]
-        # contour = np.array([[[rt_arr[v[0][0]], im_arr[v[0][1]]]] for v in contour])
-        M = cv2.moments(contour)
-        # x = int(M["m10"] / M["m00"])
-        # y = int(M["m01"] / M["m00"])
-        xs = [rt_arr[v[0][0]] for v in contour]
-        ys = [im_arr[(v[0][1])] for v in contour]
-        ax6.plot(xs, ys, color='g', linewidth=6)
-        # ax5.contour(label_mask==label)
+    if cv is not None:
+      for label, col in zip(unique_feature_labels, palette):
+          contours, _  = cv.findContours(np.array(label_mask==label).astype(np.uint8), cv.RETR_LIST, cv.CHAIN_APPROX_NONE)
+          contour = contours[0]
+          # contour = np.array([[[rt_arr[v[0][0]], im_arr[v[0][1]]]] for v in contour])
+          M = cv.moments(contour)
+          # x = int(M["m10"] / M["m00"])
+          # y = int(M["m01"] / M["m00"])
+          xs = [rt_arr[v[0][0]] for v in contour]
+          ys = [im_arr[(v[0][1])] for v in contour]
+          ax6.plot(xs, ys, color='g', linewidth=6)
+    else:
+        print("Error: Failed to import cv2, will not be able to generate contours. Will fall back to using scatter for labelling features.")
+        for label, col in zip(unique_feature_labels, palette):
+            ax5.scatter(rt_arr[np.where(label_mask==label)[1]], im_arr[np.where(label_mask==label)[0]],color=col, s=15, alpha=0.6)
     for y, x, label, col in zip(i, j, unique_feature_labels, palette):
         ax6.text(rt_arr[y], im_arr[x], str(int(label)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
     twod_quant_str = ""
@@ -378,94 +383,6 @@ def plot_2d_qaunt_results_check_watershed(arr, arr_blur, im_arr, rt_arr, im_prom
       plt.show()
     # Save Figure
     fig.savefig(fname, dpi=fig.dpi)
-
-def plot_xic_xim_subplot():
-    
-    # from pyopenms import *
-
-    plt.close('all')
-    fig, ((ax1, ax2)) = plt.subplots(1,2, figsize=(10, 10), sharex=False, sharey=True)
-    fig.set_tight_layout(True)
-    
-    
-    uni_ims = np.unique(data_filt.im)
-    # exp_im_indx = np.argmin(np.abs(np.unique(uni_ims) - 0.971191683025569))
-    exp_im_indx = np.argmin(np.abs(np.unique(uni_ims) - 0.831202491539261))
-    exp_im_indx = np.argmin(np.abs(np.unique(uni_ims) - 1.146577))
-    exp_im_indx = np.argmin(np.abs(np.unique(uni_ims) - pep_coord['im_apex']))
-    uni_ims[exp_im_indx-3:exp_im_indx+3]
-    
-    exp = MSExperiment()
-    # Set raw data (RT and intensity)
-    for im_val in uni_ims[exp_im_indx-3:exp_im_indx+3]:
-        # Create new chromatogram
-        chromatogram = MSChromatogram()
-        data_sub = data_filt[['rt', 'im', 'int']][data_filt.im==im_val]
-        rt = data_sub.rt.to_numpy()
-        intensity = data_sub.int.to_numpy()
-        chromatogram.set_peaks([rt, intensity])
-        # Sort the peaks according to ascending retention time
-        chromatogram.sortByPosition()
-        # Add meta information to the chromatogram
-        # chromatogram.setNativeID(filter_peptides)
-        # Add chromatogram to experiment
-        exp.addChromatogram(chromatogram)
-    
-    
-    for chrom in exp.getChromatograms():
-        retention_times, intensities = chrom.get_peaks()
-        ax1.plot(retention_times, intensities, label = chrom.getNativeID())
-    
-    # ax1.axvline(1221.90222167969, color='r')
-    # ax1.axvline(1246.90295410156, color='r')
-    # ax1.axvline(298.951477050781, color='r')
-    # ax1.axvline(322.169372558594, color='r')
-    # ax1.axvline(13.23825*60, color='r')
-    ax1.axvline(pep_coord['rt_apex'], color='r')
-    ax1.set_title('XIC')
-    ax1.set_xlabel('time (s)')
-    ax1.set_ylabel('intensity (cps)')
-    ax1.legend()
-    
-    uni_ims = np.unique(data_filt.rt)
-    # exp_im_indx = np.argmin(np.abs(np.unique(uni_ims) - 1234.55))
-    # exp_im_indx = np.argmin(np.abs(np.unique(uni_ims) - 308.921))
-    exp_im_indx = np.argmin(np.abs(np.unique(uni_ims) - pep_coord['rt_apex']))
-    
-    exp = MSExperiment()
-    # Set raw data (RT and intensity)
-    for im_val in uni_ims[exp_im_indx-3:exp_im_indx+3]:
-        # Create new chromatogram
-        chromatogram = MSChromatogram()
-        data_sub = data_filt[['rt', 'im', 'int']][data_filt.rt==im_val]
-        rt = data_sub.im.to_numpy()
-        intensity = data_sub.int.to_numpy()
-        chromatogram.set_peaks([rt, intensity])
-        # Sort the peaks according to ascending retention time
-        chromatogram.sortByPosition()
-        # Add meta information to the chromatogram
-        # chromatogram.setNativeID(filter_peptides)
-        # Add chromatogram to experiment
-        exp.addChromatogram(chromatogram)
-    
-    for chrom in exp.getChromatograms():
-        retention_times, intensities = chrom.get_peaks()
-        ax2.plot(retention_times, intensities, label = chrom.getNativeID())
-    
-    # plt.axvline(1221.90222167969, color='r')
-    # plt.axvline(1246.90295410156, color='r')
-    # ax2.axvline(0.971191683025569, color='r')
-    # ax2.axvline(0.831202491539261, color='r')
-    ax2.axvline(pep_coord['im_apex'], color='r')
-    ax2.set_title('XIM')
-    ax2.set_xlabel('time (s)')
-    ax2.set_ylabel('intensity (cps)')
-    ax2.legend()
-    # plt.tight_layout()
-    fig.suptitle(filter_peptides)
-    # fig.tight_layout()
-    plt.show()
-    plt.close('all')
 
 
 class two_dimension_plotter:
@@ -518,9 +435,7 @@ class two_dimension_plotter:
     
     gs = gridspec.GridSpec(3, 3)
     if self.pep_coord is not None and 'decoy' in self.pep_coord.keys():
-      self.fig.suptitle(f"{self.pep_coord['peptide']}_{self.pep_coord['charge']}_(decoy={self.pep_coord['decoy']})")
-    elif self.pep_coord is not None:
-      self.fig.suptitle(f"{self.pep_coord['peptide']}_{self.pep_coord['charge']}")
+      self.fig.suptitle(f"{self.precursor_id}_(decoy={self.pep_coord['decoy']})")
     elif self.precursor_id is not None:
       self.fig.suptitle(self.precursor_id)
     self.fig.set_tight_layout(True)
@@ -540,14 +455,21 @@ class two_dimension_plotter:
       twod_quant_str = ""
       for label, col in zip(unique_feature_labels, palette):
         tmp_mask = np.array(self.labelled_mask==label).astype(np.uint8)
-        # blur mask to try help generate better contours.
-        tmp_mask = cv2.medianBlur(tmp_mask, 5)
-        contours, _  = cv2.findContours(tmp_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        contour = contours[0]
-        M = cv2.moments(contour)
-        xs = [self.rt_arr[v[0][0]] for v in contour]
-        ys = [self.im_arr[(v[0][1])] for v in contour]
-        main_plot.plot(xs, ys, color=col, linewidth=3)
+        if cv is None:
+            # blur mask to try help generate better contours.
+            ## TODO: Blur makes small labels all 0
+            tmp_mask_blur = cv.medianBlur(tmp_mask, 5)
+            if np.sum(tmp_mask_blur)!=0:
+                tmp_mask = tmp_mask_blur
+            contours, _  = cv.findContours(tmp_mask, cv.RETR_LIST, cv.CHAIN_APPROX_NONE)
+            contour = contours[0]
+            M = cv.moments(contour)
+            xs = [self.rt_arr[v[0][0]] for v in contour]
+            ys = [self.im_arr[(v[0][1])] for v in contour]
+            main_plot.plot(xs, ys, color=col, linewidth=3)
+        else:
+            print("Error: Failed to import cv2, will not be able to generate contours. Will fall back to using scatter for labelling features.")
+            main_plot.scatter(self.rt_arr[np.where(self.labelled_mask==label)[1]], self.im_arr[np.where(self.labelled_mask==label)[0]],color=col, s=15, alpha=0.6)
         tmp_arr_feature = np.zeros(self.arr.shape)
         tmp_arr_feature[tmp_mask.astype(bool)] = self.arr[tmp_mask.astype(bool)]
         y, x = np.unravel_index(np.argmax(tmp_arr_feature, axis=None), self.arr.shape)
@@ -572,7 +494,7 @@ class two_dimension_plotter:
       left_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][0]))
       right_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][1]))
       oned_quant_str = r"$\sum_{i=left}^{right} Int$: " + f"{np.round(np.sum(np.sum(self.arr, axis=0)[left_index:right_index])):,}"
-      oned_quant_str = oned_quant_str + f"\n Apex Int: {np.round(np.max(np.sum(self.arr, axis=0))):,}"
+      oned_quant_str = oned_quant_str + f"\n Apex Int: {np.round(np.max(np.sum(self.arr, axis=0)[left_index:right_index])):,}"
       at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
       at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
       xic_plot.add_artist(at)
@@ -597,5 +519,6 @@ class two_dimension_plotter:
       plt.show()
     
     self.fig.savefig(self.fname, dpi=self.fig.dpi)
+    plt.close(self.fig)
 
   
