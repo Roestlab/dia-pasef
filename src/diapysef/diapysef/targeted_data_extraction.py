@@ -652,7 +652,7 @@ class TargeteddiaPASEFExperiment(data_io):
                     'peptide', self.peptides[target_peptide_group]['peptide'])
                 spec.setMetaValue(
                     'precursor_mz', self.peptides[target_peptide_group]['precursor_mz'])    
-                [spec.setMetaValue(f'product_mz_{i}', mz) for i, mz in zip(range(0, len(self.peptides[target_peptide_group]['product_mz'])), self.peptides[target_peptide_group]['product_mz'])]
+                [spec.setMetaValue(f'product_mz_{i}', mz) for i, mz in zip(range(0, len(np.unique(self.peptides[target_peptide_group]['product_mz']))), np.unique(self.peptides[target_peptide_group]['product_mz']))]
                 if 'rt_apex' in self.peptides[target_peptide_group].keys():
                     spec.setMetaValue(
                     'rt_apex', self.peptides[target_peptide_group]['rt_apex'])
@@ -735,7 +735,7 @@ class TargeteddiaPASEFExperiment(data_io):
             # Get Coordinates for current peptide
             target_peptide = self.peptides[target_peptide_group]['peptide']
             target_precursor_mz = self.peptides[target_peptide_group]['precursor_mz']
-            target_product_mz = self.peptides[target_peptide_group]['product_mz']
+            target_product_mz = np.unique(self.peptides[target_peptide_group]['product_mz'])
             rt_apex = self.peptides[target_peptide_group]['rt_apex']
             im_apex = self.peptides[target_peptide_group]['im_apex']
 
