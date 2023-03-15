@@ -109,6 +109,9 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
 
             sql_query = f'''
               SELECT
+              PEPTIDE.ID as peptide_id,
+              PRECURSOR.ID as precursor_id,
+              TRANSITION.ID as transition_id,
               PEPTIDE.MODIFIED_SEQUENCE AS peptide,
               PRECURSOR.PRECURSOR_MZ AS precursor_mz,
               PRECURSOR.CHARGE AS charge,
@@ -116,6 +119,8 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
               TRANSITION.CHARGE AS product_charge,
               TRANSITION.ANNOTATION AS product_annotation,
               TRANSITION.DETECTING AS product_detecting,
+              FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
+              PRECURSOR.LIBRARY_DRIFT_TIME AS assay_im,
               FEATURE.EXP_RT AS rt_apex,
               FEATURE.LEFT_WIDTH AS left_width,
               FEATURE.RIGHT_WIDTH AS right_width,
