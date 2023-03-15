@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 from __future__ import print_function
+from scipy.signal import find_peaks, peak_widths
+from scipy.signal import savgol_filter
+import pyopenms as po
 import pickle
 import os.path
 import pandas as pd
@@ -16,36 +19,34 @@ from tqdm import tqdm
 # Logging
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
-import pyopenms as po
-from scipy.signal import savgol_filter
-try:
-  import cv2 as cv
-except ImportError:
-  cv = None
-
-from scipy.signal import find_peaks, peak_widths
-
+from skimage.morphology import disk, binary_dilation
+from scipy.ndimage import binary_fill_holes
+from scipy.spatial import ConvexHull
 
 # Plotting
 matplotlib.use('Agg')
 
 # Data
 
-def get_one_dimension_peaks(arr):  
-  # Get mean of 1D arrays for im and rt
-  im_acr_rt = np.mean(arr, axis=1)
-  rt_acc_im = np.mean(arr, axis=0)
-  # Smooth 1D arrays for peak picking
-  im_acr_rt = savgol_filter(im_acr_rt, window_length=9, polyorder=3 )
-  rt_acc_im = savgol_filter(rt_acc_im, window_length=5, polyorder=3 )
-  # Get peaks and boundaries for im array
-  im_peaks, im_pk_prop = find_peaks(im_acr_rt, prominence=1)
-  im_pk_widths, im_pk_width_heights, im_pk_left, im_peak_right = peak_widths(im_acr_rt, im_peaks, rel_height=0.98)
-  # Get peaks and boundaries for rt array
-  rt_peaks, rt_pk_prop = find_peaks(rt_acc_im, prominence=1)
-  rt_pk_widths, rt_pk_width_heights, rt_pk_left, rt_peak_right = peak_widths(rt_acc_im, rt_peaks, rel_height=0.98)
-  
-  return (im_peaks, im_pk_left, im_peak_right, im_pk_width_heights), (rt_peaks, rt_pk_left, rt_peak_right, rt_pk_width_heights)
+
+def get_one_dimension_peaks(arr):
+    # Get mean of 1D arrays for im and rt
+    im_acr_rt = np.mean(arr, axis=1)
+    rt_acc_im = np.mean(arr, axis=0)
+    # Smooth 1D arrays for peak picking
+    im_acr_rt = savgol_filter(im_acr_rt, window_length=9, polyorder=3)
+    rt_acc_im = savgol_filter(rt_acc_im, window_length=5, polyorder=3)
+    # Get peaks and boundaries for im array
+    im_peaks, im_pk_prop = find_peaks(im_acr_rt, prominence=1)
+    im_pk_widths, im_pk_width_heights, im_pk_left, im_peak_right = peak_widths(
+        im_acr_rt, im_peaks, rel_height=0.98)
+    # Get peaks and boundaries for rt array
+    rt_peaks, rt_pk_prop = find_peaks(rt_acc_im, prominence=1)
+    rt_pk_widths, rt_pk_width_heights, rt_pk_left, rt_peak_right = peak_widths(
+        rt_acc_im, rt_peaks, rel_height=0.98)
+
+    return (im_peaks, im_pk_left, im_peak_right, im_pk_width_heights), (rt_peaks, rt_pk_left, rt_peak_right, rt_pk_width_heights)
+
 
 def plot_window_layout(windows, precursor_map=None, display_sc=False):
     """Plots the windows with an optional background of ms1 features"""
@@ -203,7 +204,8 @@ def save_report_2d_rt_im_heatmap(infile, outpdf="diapasef_rt_im_heatmap.pdf", pl
             plt.clf()  # clear figure once saved
         plt.close()
 
-def plot_2d_qaunt_results_check(arr: np.array, arr_blur: np.array, i: list, j: list, masked: np.array, mask: np.array, label_mask: any=None, fname: str="2D_Quantification_check.png", print_plot: bool=False):
+
+def plot_2d_qaunt_results_check(arr: np.array, arr_blur: np.array, i: list, j: list, masked: np.array, mask: np.array, label_mask: any = None, fname: str = "2D_Quantification_check.png", print_plot: bool = False):
     """
     Plot results from 2D quantification to check performance
 
@@ -222,11 +224,13 @@ def plot_2d_qaunt_results_check(arr: np.array, arr_blur: np.array, i: list, j: l
     """
     # Get unique feature labels
     if label_mask is not None:
-        unique_feature_labels = np.unique(label_mask)[np.logical_not(np.isnan(np.unique(label_mask)))]
+        unique_feature_labels = np.unique(
+            label_mask)[np.logical_not(np.isnan(np.unique(label_mask)))]
         # Generate a palette of n unique feature label colors
         palette = sns.color_palette("Dark2", len(unique_feature_labels))
     plt.close()
-    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2,3, figsize=(10, 10), sharex=True, sharey=True)
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(
+        2, 3, figsize=(10, 10), sharex=True, sharey=True)
     fig.set_tight_layout(True)
     ax1.imshow(arr, aspect='auto', cmap="afmhot_r")
     ax1.set_title('Original')
@@ -235,42 +239,48 @@ def plot_2d_qaunt_results_check(arr: np.array, arr_blur: np.array, i: list, j: l
     ax3.imshow(arr, aspect='auto', cmap="afmhot_r")
     ax3.set_title('Seeds')
     # plt.imshow(image, origin='lower', aspect='auto')
-    ax3.plot(i,j,'go', markersize=10, alpha=0.8)
+    ax3.plot(i, j, 'go', markersize=10, alpha=0.8)
     ax4.imshow(masked, 'jet', interpolation='none', alpha=0.7, aspect='auto')
     ax4.set_title('Smoothed\nMask')
     if label_mask is not None:
         ax5.imshow(mask, aspect='auto')
         for label, col in zip(unique_feature_labels, palette):
-            ax5.scatter(np.where(label_mask==label)[1], np.where(label_mask==label)[0],color=col, s=15)
+            ax5.scatter(np.where(label_mask == label)[1], np.where(
+                label_mask == label)[0], color=col, s=15)
         ax5.set_title('Labeled\nMask')
         ax6.imshow(arr, aspect='auto', cmap="afmhot_r")
         for label, col in zip(unique_feature_labels, palette):
-            ax6.scatter(np.where(label_mask==label)[1], np.where(label_mask==label)[0],color=col, s=15)
+            ax6.scatter(np.where(label_mask == label)[1], np.where(
+                label_mask == label)[0], color=col, s=15)
         ax6.set_title('Labeled\nFeature')
         # for y, x, label, col in zip(i, j, unique_feature_labels, palette):
-            # ax6.text(y, x, str(int(label)), color="white", fontsize=10, bbox=dict(fill="gray", edgecolor="green", linewidth=2))
-    plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=0.95, wspace=0.2, hspace=0.2)
+           # ax6.text(y, x, str(int(label)), color="white", fontsize=10, bbox=dict(fill="gray", edgecolor="green", linewidth=2))
+    plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95,
+                        top=0.95, wspace=0.2, hspace=0.2)
     if print_plot:
-      plt.show()
+        plt.show()
     # Save Figure
     fig.savefig(fname, dpi=fig.dpi)
 
-def plot_2d_qaunt_results_check_watershed(arr, arr_blur, im_arr, rt_arr, im_prominence, rt_prominence, pep_coord, mask, label_mask, i, j, fname: str="2D_Quantification_check.png", print_plot: bool=False):
-   
-    
+
+def plot_2d_qaunt_results_check_watershed(arr, arr_blur, im_arr, rt_arr, im_prominence, rt_prominence, pep_coord, mask, label_mask, i, j, fname: str = "2D_Quantification_check.png", print_plot: bool = False):
+
     plt.close("all")
-    fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3,2, figsize=(10, 15), sharex=False, sharey=False)
+    fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(
+        3, 2, figsize=(10, 15), sharex=False, sharey=False)
     if pep_coord is not None and 'decoy' in pep_coord.keys():
-      fig.suptitle(f"{pep_coord['peptide']}_{pep_coord['charge']}_(decoy={pep_coord['decoy']})")
+        fig.suptitle(
+            f"{pep_coord['peptide']}_{pep_coord['charge']}_(decoy={pep_coord['decoy']})")
     elif pep_coord is not None:
-      fig.suptitle(f"{pep_coord['peptide']}_{pep_coord['charge']}")
+        fig.suptitle(f"{pep_coord['peptide']}_{pep_coord['charge']}")
     fig.supxlabel('Retention Time (s)')
     fig.supylabel('Ion Mobility', y=0.35)
     fig.set_tight_layout(True)
-    
+
     # Get 1D data
-    im_peak_data, rt_peak_data = get_one_dimension_peaks(arr_blur, im_prominence=im_prominence, rt_prominence=rt_prominence)
-    
+    im_peak_data, rt_peak_data = get_one_dimension_peaks(
+        arr_blur, im_prominence=im_prominence, rt_prominence=rt_prominence)
+
     # XIC
     palette = sns.color_palette("Dark2", len(rt_peak_data[0]))
     # plt.close("all")
@@ -279,30 +289,36 @@ def plot_2d_qaunt_results_check_watershed(arr, arr_blur, im_arr, rt_arr, im_prom
     oned_quant_str = ""
     label_id = 1
     for left, right, apex, height, col in zip(rt_peak_data[1].astype(int), rt_peak_data[2].astype(int), rt_peak_data[0].astype(int), rt_peak_data[3], palette):
-      # print(col)
-      ax1.vlines(rt_arr[left], ymin=0, ymax=np.max(np.mean(arr_blur, axis=0)), color=col)
-      ax1.vlines(rt_arr[right], ymin=0, ymax=np.max(np.mean(arr_blur, axis=0)), color=col)
-      ax1.hlines(height, rt_arr[left], rt_arr[right], color=col)
-      ax1.plot(rt_arr[apex], np.mean(arr, axis=0)[apex], 'x')
-      ax1.text(rt_arr[apex], np.mean(arr, axis=0)[apex], str(int(label_id)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
-      # np.sum(np.sum(arr, axis=0)[left:right])
-      if oned_quant_str=="":
-        oned_quant_str = f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
-      else:
-        oned_quant_str = oned_quant_str + "\n" + f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
-      label_id+=1
-    at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper right')
+        # print(col)
+        ax1.vlines(rt_arr[left], ymin=0, ymax=np.max(
+            np.mean(arr_blur, axis=0)), color=col)
+        ax1.vlines(rt_arr[right], ymin=0, ymax=np.max(
+            np.mean(arr_blur, axis=0)), color=col)
+        ax1.hlines(height, rt_arr[left], rt_arr[right], color=col)
+        ax1.plot(rt_arr[apex], np.mean(arr, axis=0)[apex], 'x')
+        ax1.text(rt_arr[apex], np.mean(arr, axis=0)[apex], str(int(
+            label_id)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
+        # np.sum(np.sum(arr, axis=0)[left:right])
+        if oned_quant_str == "":
+            oned_quant_str = f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
+        else:
+            oned_quant_str = oned_quant_str + "\n" + \
+                f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
+        label_id += 1
+    at = AnchoredText(oned_quant_str, prop=dict(
+        size=8), frameon=True, loc='upper right')
     at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
     ax1.add_artist(at)
     if pep_coord is not None and 'intensity' in pep_coord.keys():
-      ax1.axvline(pep_coord['rt_apex'], color='r')
-      at = AnchoredText(f"EG Int:\n{np.round(pep_coord['intensity'])}", prop=dict(size=8), frameon=True, loc='upper left')
-      at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-      ax1.add_artist(at)
+        ax1.axvline(pep_coord['rt_apex'], color='r')
+        at = AnchoredText(f"EG Int:\n{np.round(pep_coord['intensity'])}", prop=dict(
+            size=8), frameon=True, loc='upper left')
+        at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+        ax1.add_artist(at)
     ax1.set_xlabel('Retention time (s)')
     ax1.set_ylabel('Mean Intensity')
     ax1.set_title('XIC')
-    
+
     # XIM
     palette = sns.color_palette("Dark2", len(im_peak_data[0]))
     # plt.close("all")
@@ -311,214 +327,238 @@ def plot_2d_qaunt_results_check_watershed(arr, arr_blur, im_arr, rt_arr, im_prom
     oned_quant_str = ""
     label_id = 1
     for left, right, apex, height, col in zip(im_peak_data[1].astype(int), im_peak_data[2].astype(int), im_peak_data[0].astype(int), im_peak_data[3], palette):
-      # print(col)
-      ax2.vlines(im_arr[left], ymin=0, ymax=np.max(np.mean(arr_blur, axis=1)), color=col)
-      ax2.vlines(im_arr[right], ymin=0, ymax=np.max(np.mean(arr_blur, axis=1)), color=col)
-      ax2.hlines(height, im_arr[left], im_arr[right], color=col)
-      ax2.plot(im_arr[apex], np.mean(arr, axis=1)[apex], 'x')
-      ax2.text(im_arr[apex], np.mean(arr, axis=1)[apex], str(int(label_id)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
-      # np.sum(np.sum(arr, axis=0)[left:right])
-      if oned_quant_str=="":
-        oned_quant_str = f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
-      else:
-        oned_quant_str = oned_quant_str + "\n" + f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
-      label_id+=1
-    at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper right')
+        # print(col)
+        ax2.vlines(im_arr[left], ymin=0, ymax=np.max(
+            np.mean(arr_blur, axis=1)), color=col)
+        ax2.vlines(im_arr[right], ymin=0, ymax=np.max(
+            np.mean(arr_blur, axis=1)), color=col)
+        ax2.hlines(height, im_arr[left], im_arr[right], color=col)
+        ax2.plot(im_arr[apex], np.mean(arr, axis=1)[apex], 'x')
+        ax2.text(im_arr[apex], np.mean(arr, axis=1)[apex], str(int(
+            label_id)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
+        # np.sum(np.sum(arr, axis=0)[left:right])
+        if oned_quant_str == "":
+            oned_quant_str = f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
+        else:
+            oned_quant_str = oned_quant_str + "\n" + \
+                f"F{label_id} Int: {np.round(np.sum(np.mean(arr, axis=0)[left:right]))}"
+        label_id += 1
+    at = AnchoredText(oned_quant_str, prop=dict(
+        size=8), frameon=True, loc='upper right')
     at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
     ax2.add_artist(at)
     if pep_coord is not None:
-      ax2.axvline(pep_coord['im_apex'], color='r')
+        ax2.axvline(pep_coord['im_apex'], color='r')
     ax2.set_xlabel('Ion Mobility')
     ax2.set_ylabel('Mean Intensity')
     ax2.set_title('XIM')
-    
+
     # 2D data
-    unique_feature_labels = np.unique(label_mask[label_mask!=0])
+    unique_feature_labels = np.unique(label_mask[label_mask != 0])
     palette = sns.color_palette("Dark2", len(unique_feature_labels))
-    
+
     # Original data
-    ax3.imshow(arr, aspect='auto', cmap="afmhot_r", extent=[np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
+    ax3.imshow(arr, aspect='auto', cmap="afmhot_r", extent=[
+               np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
     ax3.set_title('Original')
-    
+
     # Mask
-    ax4.imshow(mask, aspect='auto', cmap="afmhot_r", extent=[np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
+    ax4.imshow(mask, aspect='auto', cmap="afmhot_r", extent=[
+               np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
     ax4.plot(rt_arr[i], im_arr[j], 'go', markersize=6, alpha=0.8)
     ax4.set_title('Mask and Seeds')
-    
+
     # Colred Label
-    ax5.imshow(label_mask, aspect='auto', cmap="jet", extent=[np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
+    ax5.imshow(label_mask, aspect='auto', cmap="jet", extent=[
+               np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
     ax5.set_title('Labelled Mask')
-    
+
     # Labeled data
-    ax6.imshow(arr, aspect='auto', cmap="afmhot_r", extent=[np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
-    
-    if cv is not None:
-      for label, col in zip(unique_feature_labels, palette):
-          contours, _  = cv.findContours(np.array(label_mask==label).astype(np.uint8), cv.RETR_LIST, cv.CHAIN_APPROX_NONE)
-          contour = contours[0]
-          # contour = np.array([[[rt_arr[v[0][0]], im_arr[v[0][1]]]] for v in contour])
-          M = cv.moments(contour)
-          # x = int(M["m10"] / M["m00"])
-          # y = int(M["m01"] / M["m00"])
-          xs = [rt_arr[v[0][0]] for v in contour]
-          ys = [im_arr[(v[0][1])] for v in contour]
-          ax6.plot(xs, ys, color='g', linewidth=6)
-    else:
-        print("Error: Failed to import cv2, will not be able to generate contours. Will fall back to using scatter for labelling features.")
-        for label, col in zip(unique_feature_labels, palette):
-            ax5.scatter(rt_arr[np.where(label_mask==label)[1]], im_arr[np.where(label_mask==label)[0]],color=col, s=15, alpha=0.6)
+    ax6.imshow(arr, aspect='auto', cmap="afmhot_r", extent=[
+               np.min(rt_arr), np.max(rt_arr), np.max(im_arr), np.min(im_arr)])
+    for label, col in zip(unique_feature_labels, palette):
+        ax6.scatter(rt_arr[np.where(label_mask == label)[1]], im_arr[np.where(
+            label_mask == label)[0]], color=col, s=15, alpha=0.6)
     for y, x, label, col in zip(i, j, unique_feature_labels, palette):
-        ax6.text(rt_arr[y], im_arr[x], str(int(label)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
+        ax6.text(rt_arr[y], im_arr[x], str(int(label)), color="white", fontsize=6, bbox=dict(
+            fill="gray", edgecolor="green", linewidth=1))
     twod_quant_str = ""
-    for label_id in np.unique(label_mask[label_mask!=0]):
-      if twod_quant_str=="":
-        twod_quant_str = f"F{label_id} Int: {np.round(np.sum(arr[label_mask==label_id]))}"
-      else:
-        twod_quant_str = twod_quant_str + "\n" + f"F{label_id} Int: {np.round(np.sum(arr[label_mask==label_id]))}"
-    at = AnchoredText(twod_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
+    for label_id in np.unique(label_mask[label_mask != 0]):
+        if twod_quant_str == "":
+            twod_quant_str = f"F{label_id} Int: {np.round(np.sum(arr[label_mask==label_id]))}"
+        else:
+            twod_quant_str = twod_quant_str + "\n" + \
+                f"F{label_id} Int: {np.round(np.sum(arr[label_mask==label_id]))}"
+    at = AnchoredText(twod_quant_str, prop=dict(
+        size=8), frameon=True, loc='upper left')
     at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
     ax6.add_artist(at)
     ax6.set_title('Labelled Features')
     if print_plot:
-      plt.show()
+        plt.show()
     # Save Figure
     fig.savefig(fname, dpi=fig.dpi)
 
 
 class two_dimension_plotter:
-  """
-  Class to produce RT and IM 2D plots
-  """
-  def __init__(self, arr, im_arr=None, rt_arr=None, pep_coord=None, labelled_mask=None, precursor_id=None, fname="two_dimension_report.png", print_plot=False):
     """
-    Initialize object
+    Class to produce RT and IM 2D plots
+    """
 
-    params:
-        arr: (numpy.ndarray) (im, rt) 2D array to plot
-        im_arr: (numpy.ndarray) (im,) 1D array of ion mobility values. (Optional) Will use indexes if None
-        rt_arr: (numpy.ndarray) (rt,) 1D array of retention values. (Optional) Will use indexes if None
-        pep_coord: (dict) information for current precursor to plot. i.e. {'peptide': 'T(UniMod:21)ELISVSEVHPSR', 'precursor_mz': 767.3691, 'charge': 2, 'rt_apex': 1730.08, 'im_apex': 1.026132868499893, 'qvalue': 0.0, 'product_mz': [496.2627, 811.4057, 910.4741, 997.5061, 1110.5902, 1223.6743], 'product_charge': [1, 1, 1, 1, 1, 1], 'product_annotation': ['y4^1', 'y7^1', 'y8^1', 'y9^1', 'y10^1', 'y11^1'], 'product_detecting': [1, 1, 1, 1, 1, 1], 'rt_boundaries': [1718.036865234375, 1751.983642578125]}
-        labelled_mask: (numpy.ndarray) (im, rt) labelled feature mask. 0's are background (not a feature), 1, 2, 3, ... n are labelled features
-        precursor_id: (str) string of current precursor
-        fname: (str) name to save file as
-        print_plot: (bool) print plot if using an interactive session
-        
-    Returns:
-        None
-    """
-    
-    self.arr = arr
-    self.using_im_shape_indexes = False
-    self.using_rt_shape_indexes = False
-    if im_arr is None:
-      im_arr = np.arange(arr.shape[0])
-      self.using_im_shape_indexes = True
-    self.im_arr = im_arr
-    if rt_arr is None:
-      rt_arr = np.arange(arr.shape[1])
-      self.using_rt_shape_indexes = True
-    self.rt_arr = rt_arr
-    self.pep_coord = pep_coord
-    self.labelled_mask = labelled_mask
-    self.precursor_id = precursor_id
-    self.fname = fname
-    self.print_plot = print_plot
-    
-    # Figure stuff
-    self.fig = plt.figure(figsize=(10,10))
-    
-  def plot(self):
-    """
-    Plot Generation
-    """
-    # Generate single plot of arr
-    
-    gs = gridspec.GridSpec(3, 3)
-    if self.pep_coord is not None and 'decoy' in self.pep_coord.keys():
-      self.fig.suptitle(f"{self.precursor_id}_(decoy={self.pep_coord['decoy']})")
-    elif self.precursor_id is not None:
-      self.fig.suptitle(self.precursor_id)
-    self.fig.set_tight_layout(True)
-    
-    # Set gridspace
-    main_plot = plt.subplot(gs[1:3, :2])
-    xic_plot = plt.subplot(gs[0, :2],sharex=main_plot)
-    xim_plot = plt.subplot(gs[1:3, 2],sharey=main_plot)
-    cbar_ax = plt.subplot(gs[0, 2])
-    
-    # two dimension arr
-    main_plot_img = main_plot.imshow(self.arr, aspect='auto', cmap="afmhot_r", extent=[np.min(self.rt_arr), np.max(self.rt_arr), np.max(self.im_arr), np.min(self.im_arr)])
-    ## Add labelled Contours if available
-    if self.labelled_mask is not None:
-      unique_feature_labels = np.unique(self.labelled_mask[self.labelled_mask!=0])
-      palette = sns.color_palette("Dark2", len(unique_feature_labels))
-      twod_quant_str = ""
-      for label, col in zip(unique_feature_labels, palette):
-        tmp_mask = np.array(self.labelled_mask==label).astype(np.uint8)
-        if cv is not None:
-            # blur mask to try help generate better contours.
-            ## TODO: Blur makes small labels all 0
-            tmp_mask_blur = cv.medianBlur(tmp_mask, 5)
-            if np.sum(tmp_mask_blur)!=0:
-                tmp_mask = tmp_mask_blur
-            contours, _  = cv.findContours(tmp_mask, cv.RETR_LIST, cv.CHAIN_APPROX_NONE)
-            contour = contours[0]
-            M = cv.moments(contour)
-            xs = [self.rt_arr[v[0][0]] for v in contour]
-            ys = [self.im_arr[(v[0][1])] for v in contour]
-            main_plot.plot(xs, ys, color=col, linewidth=3)
-        else:
-            print("Error: Failed to import cv2, will not be able to generate contours. Will fall back to using scatter for labelling features.")
-            main_plot.scatter(self.rt_arr[np.where(self.labelled_mask==label)[1]], self.im_arr[np.where(self.labelled_mask==label)[0]],color=col, s=15, alpha=0.6)
-        tmp_arr_feature = np.zeros(self.arr.shape)
-        tmp_arr_feature[tmp_mask.astype(bool)] = self.arr[tmp_mask.astype(bool)]
-        y, x = np.unravel_index(np.argmax(tmp_arr_feature, axis=None), self.arr.shape)
-        main_plot.text(self.rt_arr[x], self.im_arr[y], str(int(label)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
-        if twod_quant_str=="":
-          twod_quant_str = f"F{label} Int: {np.round(np.sum(tmp_arr_feature)):,}"
-        else:
-          twod_quant_str = twod_quant_str + "\n" + f"F{label} Int: {np.round(np.sum(tmp_arr_feature)):,}"
-      at = AnchoredText(twod_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
-      at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-      main_plot.add_artist(at)
-    main_plot.set_xlabel('Retention Time (s)')
-    main_plot.set_ylabel('Ion Mobility')
-    
-    # one dimension arr 1
-    xic_plot.plot(self.rt_arr, np.sum(self.arr, axis=0))
-    if self.pep_coord is not None and not self.using_rt_shape_indexes:
-      xic_plot.vlines(self.pep_coord['rt_boundaries'][0], ymin=0, ymax=np.max(np.sum(self.arr, axis=0)), color="r")
-      xic_plot.vlines(self.pep_coord['rt_boundaries'][1], ymin=0, ymax=np.max(np.sum(self.arr, axis=0)), color="r")
-      xic_plot.plot(self.pep_coord['rt_apex'], np.max(np.sum(self.arr, axis=0)), 'x')
-      # Add Summed Intensity
-      left_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][0]))
-      right_index = np.argmin(np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][1]))
-      oned_quant_str = r"$\sum_{i=left}^{right} Int$: " + f"{np.round(np.sum(np.sum(self.arr, axis=0)[left_index:right_index])):,}"
-      oned_quant_str = oned_quant_str + f"\n Apex Int: {np.round(np.max(np.sum(self.arr, axis=0)[left_index:right_index])):,}"
-      at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
-      at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-      xic_plot.add_artist(at)
-    xic_plot.tick_params(bottom=False, labelbottom=False)
-    xic_plot.set_ylabel('Summed Intensity')
-    
-    # one dimension arr 2
-    xim_plot.plot(np.sum(self.arr, axis=1), self.im_arr)
-    if self.pep_coord is not None and not self.using_im_shape_indexes:
-      xim_plot.plot(np.max(np.sum(self.arr, axis=1)), self.pep_coord['im_apex'], 'x')
-      oned_quant_str = f"Apex Int: {np.round(np.max(np.sum(self.arr, axis=1))):,}"
-      at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper right')
-      at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-      xim_plot.add_artist(at)
-    xim_plot.tick_params(left=False, labelleft=False)
-    xim_plot.set_xlabel('Summed Intensity')
-    
-    # Add color bar
-    self.fig.colorbar(main_plot_img, cax=cbar_ax)
-    
-    if self.print_plot:
-      plt.show()
-    
-    self.fig.savefig(self.fname, dpi=self.fig.dpi)
-    plt.close(self.fig)
+    def __init__(self, arr, im_arr=None, rt_arr=None, pep_coord=None, labelled_mask=None, precursor_id=None, fname="two_dimension_report.png", save_fig=True, print_plot=False):
+        """
+        Initialize object
 
-  
+        params:
+            arr: (numpy.ndarray) (im, rt) 2D array to plot
+            im_arr: (numpy.ndarray) (im,) 1D array of ion mobility values. (Optional) Will use indexes if None
+            rt_arr: (numpy.ndarray) (rt,) 1D array of retention values. (Optional) Will use indexes if None
+            pep_coord: (dict) information for current precursor to plot. i.e. {'peptide': 'T(UniMod:21)ELISVSEVHPSR', 'precursor_mz': 767.3691, 'charge': 2, 'rt_apex': 1730.08, 'im_apex': 1.026132868499893, 'qvalue': 0.0, 'product_mz': [496.2627, 811.4057, 910.4741, 997.5061, 1110.5902, 1223.6743], 'product_charge': [1, 1, 1, 1, 1, 1], 'product_annotation': ['y4^1', 'y7^1', 'y8^1', 'y9^1', 'y10^1', 'y11^1'], 'product_detecting': [1, 1, 1, 1, 1, 1], 'rt_boundaries': [1718.036865234375, 1751.983642578125]}
+            labelled_mask: (numpy.ndarray) (im, rt) labelled feature mask. 0's are background (not a feature), 1, 2, 3, ... n are labelled features
+            precursor_id: (str) string of current precursor
+            fname: (str) name to save file as
+            print_plot: (bool) print plot if using an interactive session
+
+        Returns:
+            None
+        """
+
+        self.arr = arr
+        self.using_im_shape_indexes = False
+        self.using_rt_shape_indexes = False
+        if im_arr is None:
+            im_arr = np.arange(arr.shape[0])
+            self.using_im_shape_indexes = True
+        self.im_arr = im_arr
+        if rt_arr is None:
+            rt_arr = np.arange(arr.shape[1])
+            self.using_rt_shape_indexes = True
+        self.rt_arr = rt_arr
+        self.pep_coord = pep_coord
+        self.labelled_mask = labelled_mask
+        self.precursor_id = precursor_id
+        self.fname = fname
+        self.save_fig = save_fig
+        self.print_plot = print_plot
+
+        # Figure stuff
+        self.fig = plt.figure(figsize=(10, 10))
+    
+    def plot(self):
+        """
+        Plot Generation
+        """
+        # Generate single plot of arr
+
+        gs = gridspec.GridSpec(3, 3)
+        if self.pep_coord is not None and 'decoy' in self.pep_coord.keys():
+            self.fig.suptitle(
+                f"{self.precursor_id}_(decoy={self.pep_coord['decoy']})")
+        elif self.precursor_id is not None:
+            self.fig.suptitle(self.precursor_id)
+        self.fig.set_tight_layout(True)
+
+        # Set gridspace
+        main_plot = plt.subplot(gs[1:3, :2])
+        xic_plot = plt.subplot(gs[0, :2], sharex=main_plot)
+        xim_plot = plt.subplot(gs[1:3, 2], sharey=main_plot)
+        cbar_ax = plt.subplot(gs[0, 2])
+
+        # two dimension arr
+        main_plot_img = main_plot.imshow(self.arr, aspect='auto', cmap="afmhot_r", extent=[
+                                         np.min(self.rt_arr), np.max(self.rt_arr), np.max(self.im_arr), np.min(self.im_arr)])
+        # Add labelled Contours if available
+        if self.labelled_mask is not None:
+            unique_feature_labels = np.unique(
+                self.labelled_mask[self.labelled_mask != 0])
+            palette = sns.color_palette("Dark2", len(unique_feature_labels))
+            twod_quant_str = ""
+            for label, col in zip(unique_feature_labels, palette):
+                tmp_mask = np.array(self.labelled_mask ==
+                                    label).astype(np.uint8)
+                
+                tmp_mask_blur = binary_fill_holes(tmp_mask)
+                tmp_mask = tmp_mask_blur.astype(np.uint8)
+                tmp_mask = binary_dilation(tmp_mask, disk(1)).astype(np.uint8)
+                holy_mask = binary_dilation(tmp_mask==0, np.ones((3,3), dtype=int)) & tmp_mask
+
+                coords = np.column_stack(np.where(holy_mask > 0))
+                coords = np.append(coords, [coords[0]], axis=0)
+                xs = [self.rt_arr[v[1]] for v in coords]
+                ys = [self.im_arr[v[0]] for v in coords]
+                
+                hull = ConvexHull(coords)
+                main_plot.plot(np.array(xs)[np.append(hull.vertices, hull.vertices[0])], np.array(ys)[np.append(hull.vertices, hull.vertices[0])], color=col, linewidth=3)
+
+                # Use original labelled mask for intensity summation
+                tmp_mask = np.array(self.labelled_mask ==
+                                    label).astype(np.uint8)
+                tmp_arr_feature = np.zeros(self.arr.shape)
+                tmp_arr_feature[tmp_mask.astype(
+                    bool)] = self.arr[tmp_mask.astype(bool)]
+                y, x = np.unravel_index(
+                    np.argmax(tmp_arr_feature, axis=None), self.arr.shape)
+                main_plot.text(self.rt_arr[x], self.im_arr[y], str(int(
+                    label)), color="white", fontsize=6, bbox=dict(fill="gray", edgecolor="green", linewidth=1))
+                if twod_quant_str == "":
+                    twod_quant_str = f"F{label} Int: {np.round(np.sum(tmp_arr_feature)):,}"
+                else:
+                    twod_quant_str = twod_quant_str + "\n" + \
+                        f"F{label} Int: {np.round(np.sum(tmp_arr_feature)):,}"
+            at = AnchoredText(twod_quant_str, prop=dict(
+                size=8), frameon=True, loc='upper left')
+            at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+            main_plot.add_artist(at)
+        main_plot.set_xlabel('Retention Time (s)')
+        main_plot.set_ylabel('Ion Mobility')
+
+        # one dimension arr 1
+        xic_plot.plot(self.rt_arr, np.sum(self.arr, axis=0))
+        if self.pep_coord is not None and not self.using_rt_shape_indexes:
+            xic_plot.vlines(self.pep_coord['rt_boundaries'][0], ymin=0, ymax=np.max(
+                np.sum(self.arr, axis=0)), color="r")
+            xic_plot.vlines(self.pep_coord['rt_boundaries'][1], ymin=0, ymax=np.max(
+                np.sum(self.arr, axis=0)), color="r")
+            xic_plot.plot(self.pep_coord['rt_apex'], np.max(
+                np.sum(self.arr, axis=0)), 'x')
+            # Add Summed Intensity
+            left_index = np.argmin(
+                np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][0]))
+            right_index = np.argmin(
+                np.abs(self.rt_arr - self.pep_coord['rt_boundaries'][1]))
+            try:
+                oned_quant_str = r"$\sum_{i=left}^{right} Int$: " + \
+                    f"{np.round(np.sum(np.sum(self.arr, axis=0)[left_index:right_index])):,}"
+                oned_quant_str = oned_quant_str + \
+                    f"\n Apex Int: {np.round(np.max(np.sum(self.arr, axis=0)[left_index:right_index])):,}"
+            except ValueError:
+                oned_quant_str = oned_quant_str + ""
+            at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper left')
+            at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+            xic_plot.add_artist(at)
+        xic_plot.tick_params(bottom=False, labelbottom=False)
+        xic_plot.set_ylabel('Summed Intensity')
+
+        # one dimension arr 2
+        xim_plot.plot(np.sum(self.arr, axis=1), self.im_arr)
+        if self.pep_coord is not None and not self.using_im_shape_indexes:
+            xim_plot.plot(np.max(np.sum(self.arr, axis=1)), self.pep_coord['im_apex'], 'x')
+            try:
+                oned_quant_str = f"Apex Int: {np.round(np.max(np.sum(self.arr, axis=1))):,}"
+            except ValueError:
+                oned_quant_str = oned_quant_str + ""
+            at = AnchoredText(oned_quant_str, prop=dict(size=8), frameon=True, loc='upper right')
+            at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+            xim_plot.add_artist(at)
+        xim_plot.tick_params(left=False, labelleft=False)
+        xim_plot.set_xlabel('Summed Intensity')
+
+        # Add color bar
+        self.fig.colorbar(main_plot_img, cax=cbar_ax)
+
+        if self.print_plot:
+            plt.show()
+            
+        if self.save_fig:
+            self.fig.savefig(self.fname, dpi=self.fig.dpi)
+            plt.close(self.fig)
