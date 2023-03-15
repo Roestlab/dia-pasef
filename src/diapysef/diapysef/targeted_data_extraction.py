@@ -149,6 +149,9 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
         else: # if targeted peptides is "None" than select all peptides
             sql_query = f'''
               SELECT
+              PEPTIDE.ID as peptide_id,
+              PRECURSOR.ID as precursor_id,
+              TRANSITION.ID as transition_id,
               PEPTIDE.MODIFIED_SEQUENCE AS peptide,
               PRECURSOR.PRECURSOR_MZ AS precursor_mz,
               PRECURSOR.CHARGE AS charge,
@@ -156,6 +159,8 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
               TRANSITION.CHARGE AS product_charge,
               TRANSITION.ANNOTATION AS product_annotation,
               TRANSITION.DETECTING AS product_detecting,
+              FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
+              PRECURSOR.LIBRARY_DRIFT_TIME AS assay_im,
               FEATURE.EXP_RT AS rt_apex,
               FEATURE.LEFT_WIDTH AS left_width,
               FEATURE.RIGHT_WIDTH AS right_width,
@@ -163,7 +168,9 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
               {select_feature_ms1_stmt}
               {select_feature_ms2_stmt}
               SCORE_TABLE.QVALUE as qvalue,
-              PRECURSOR.DECOY as decoy
+              PRECURSOR.DECOY as decoy,
+              FEATURE.ID AS feature_id,
+              FEATURE.RUN_ID AS run_id
               FROM PRECURSOR
               INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
               INNER JOIN PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
@@ -199,6 +206,12 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
         # Only keep the best scoring feature per group_id
         data = data.loc[data.groupby('group_id')['qvalue'].transform(
             'min').eq(data['qvalue'])].reset_index(drop=True)
+
+        # Group and aggregate transition_id into a list
+        agg_transition_id_df = data.groupby(['group_id'])['transition_id'].apply(
+            list).to_frame().reset_index()
+        data = pd.merge(data.drop('transition_id', axis=1),
+                        agg_transition_id_df, on=['group_id'])
 
         # Group and aggregate product m/z into a list
         agg_product_mz_df = data.groupby(['group_id'])['product_mz'].apply(
