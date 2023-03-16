@@ -109,6 +109,7 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
 
             sql_query = f'''
               SELECT
+              FEATURE.RUN_ID as run_id,
               PEPTIDE.ID as peptide_id,
               PRECURSOR.ID as precursor_id,
               TRANSITION.ID as transition_id,
@@ -154,6 +155,7 @@ def generate_coordinates(infile, outfile=None, run_id=None, target_peptides=None
         else: # if targeted peptides is "None" than select all peptides
             sql_query = f'''
               SELECT
+              FEATURE.RUN_ID as run_id,
               PEPTIDE.ID as peptide_id,
               PRECURSOR.ID as precursor_id,
               TRANSITION.ID as transition_id,
