@@ -6,6 +6,7 @@ import numpy as np
 import sqlite3
 import zlib
 import traceback
+import logging
 import multiprocessing 
 from tqdm import tqdm
 from datetime import datetime
@@ -219,7 +220,7 @@ def process_data(data_type: str, group: pd.DataFrame, id: int) -> None:
         transaction_query += query + "\n"
     return transaction_query
 
-def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, shared_id: multiprocessing.Manager, lock: multiprocessing.Lock) -> None:
+def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, shared_id: multiprocessing.Manager, lock: multiprocessing.Lock, mz_tol: int = 25) -> None:
     """
     Process precursor data and insert into database.
 
@@ -260,7 +261,7 @@ def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, s
             dt_filt.loc[mask.any(axis=1), ['mz_annotation']] = prod_mz[np.argmax(mask[mask.any(axis=1)], axis=1)]
 
         except ValueError as e:
-            print(f"Error: {e} for precursor {precursor_str}")
+            logging.error(f"Error: {e} for precursor {precursor_str}")
             traceback.print_exc()
             raise e
     
@@ -302,7 +303,7 @@ def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, s
                 id = shared_id.value
                 shared_id.value += 1
     except ValueError as e:
-        print(f"Error: {e} for precursor {precursor_str}")
+        logging.error(f"Error: {e} for precursor {precursor_str}")
         traceback.print_exc()
         raise e
 
@@ -331,7 +332,7 @@ def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, s
                     id = shared_id.value
                     shared_id.value += 1
     except ValueError as e:
-        print(f"Error: {e} for precursor {precursor_str}")
+        logging.error(f"Error: {e} for precursor {precursor_str}")
         traceback.print_exc()
         raise e
 
@@ -340,7 +341,7 @@ def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, s
         transaction_query += query + "\n"
     return transaction_query
 
-def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None):
+def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None, mz_tol: int = 25):
     """
     Exports precursor mass data to an SQLite database file.
 
@@ -382,9 +383,9 @@ def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None)
 
     # Create database if it doesn't exist
     if os.path.exists(db_filename):
-        print(f"Info: Database file {db_filename} already exists.  Skipping creation.") 
+        logging.error(f"Info: Database file {db_filename} already exists.  Skipping creation.") 
     else:
-        print(f"Info: Creating database file {db_filename}")
+        logging.info(f"Info: Creating database file {db_filename}")
         create_database(db_filename)
 
     # Create a connection to the database
@@ -405,16 +406,16 @@ def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None)
     pd.options.mode.chained_assignment = None  # default='warn'
 
     start_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # get the current date and time
+    logging.info(f"Started generating queries {start_date}.")
     with multiprocessing.Manager() as manager:
         shared_id = manager.Value('i', 0)
         lock = manager.Lock()
         # Create a pool of processes to write the data to the database
         with multiprocessing.Pool(processes=num_processes) as pool:
-            args = [(precursor_str, coords_data, dt, shared_id, lock) for precursor_str in precursors]
+            args = [(precursor_str, coords_data, dt, shared_id, lock, mz_tol) for precursor_str in precursors]
             results = list(tqdm(pool.starmap(process_precursor, args), total=len(args)))
     end_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # get the current date and time
-    print(f"Info: Started generating queries {start_date}.")
-    print(f"Info: Finished generatign queries {end_date}.")
+    logging.info(f"Finished generatign queries {end_date}.")
 
     # Re-enable the SettingWithCopyWarning
     pd.options.mode.chained_assignment = 'warn'
@@ -432,12 +433,11 @@ def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None)
     start_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # get the current date and time
 
     # execute queries using executemany()
+    logging.info(f"Started writing data to database at {start_date}.")
     cursor.executescript(transaction_query)
     conn.commit()
-
     end_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # get the current date and time
-    print(f"Info: Started writing data to database at {start_date}.")
-    print(f"Info: Finished writing data to database at {end_date}.")
+    logging.info(f"Finished writing data to database at {end_date}.")
 
     # close connection
     conn.close()
