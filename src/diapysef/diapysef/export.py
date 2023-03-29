@@ -1,8 +1,11 @@
 import os
+import click
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Tuple, List, Any, Optional, Union, Dict
 import pandas as pd
 import numpy as np
+import pickle
 import sqlite3
 import zlib
 import traceback
@@ -10,6 +13,8 @@ import logging
 import multiprocessing 
 from tqdm import tqdm
 from datetime import datetime
+
+from .targeted_data_extraction import TargeteddiaPASEFExperiment
 
 def get_upper_lower_tol(target_mz_list: list, mz_tol: int):
     """
@@ -234,7 +239,7 @@ def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, s
     Returns:
         None
     """
-    dt_filt = dt.loc[dt['precursor_id'] == precursor_str]
+    dt_filt = dt.loc[dt['precursor_id'] == precursor_str].reset_index(drop=True)
     pep_coord = coords_data[precursor_str]
 
     dt_filt.loc[:, 'mz_annotation'] = dt_filt['mz']
@@ -341,7 +346,7 @@ def process_precursor(precursor_str: str, coords_data: dict, dt: pd.DataFrame, s
         transaction_query += query + "\n"
     return transaction_query
 
-def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None, mz_tol: int = 25):
+def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None, mz_tol: int = 25, mslevel: list=[1,2], verbose: int=0, num_processes: int=1):
     """
     Exports precursor mass data to an SQLite database file.
 
@@ -374,16 +379,29 @@ def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None,
     if db_filename is None:
         db_filename = os.path.splitext(file)[0] + ".sqMass"
 
-    # Load data
-    dt = pd.read_csv(file, sep="\t")
-    dt['precursor_id'] = dt['peptide'].apply(str) + '_' + dt['charge'].apply(str)
+    # Check file type
+    file_type = os.path.splitext(file)[1]
+    if file_type == ".tsv":
+        # Load data
+        dt = pd.read_csv(file, sep="\t")
+        dt['precursor_id'] = dt['peptide'].apply(str) + '_' + dt['charge'].apply(str)
+    elif file_type == ".mzML":
+        # Load data from targeted extracted mzML data
+        # TODO: Need to add a tag in targeted extracted data to indicate the mzML file is not the original raw data
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Exporting Targeted mzML to sqMass...")
+        exp = TargeteddiaPASEFExperiment(file, None, None, None, None, mslevel, verbose, None, None)
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
+        exp.load_data(is_filtered=True)
+        dt = exp.get_filtered_df(mslevel)
+        dt['precursor_id'] = dt['peptide'].apply(str) + '_' + dt['charge'].apply(str)
 
     # Load precursor coords dictionary
     coords_data = pd.read_pickle(coordsfile)
 
     # Create database if it doesn't exist
     if os.path.exists(db_filename):
-        logging.error(f"Info: Database file {db_filename} already exists.  Skipping creation.") 
+        # logging.error(f"Info: Database file {db_filename} already exists.  Deleting old file.") 
+        raise ValueError(f"Database file {db_filename} already exists.  Delete old file first.")
     else:
         logging.info(f"Info: Creating database file {db_filename}")
         create_database(db_filename)
@@ -398,9 +416,6 @@ def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None,
 
     # precursors
     precursors = np.unique(dt.precursor_id)
-
-    # Set the number of processes to use
-    num_processes = 10
 
     # Disable the SettingWithCopyWarning
     pd.options.mode.chained_assignment = None  # default='warn'
@@ -441,3 +456,116 @@ def export_sqmass(file: str, coordsfile: str, db_filename: Optional[str] = None,
 
     # close connection
     conn.close()
+
+
+def data_transform(filter_peptides: str, data_ms1: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Transforms the input dataframe into a 2D numpy array containing only intensity values and returns it along with rt_arr and im_arr.
+
+    Args:
+        filter_peptides: A string representing a peptide.
+        data_ms1: A pandas dataframe representing the data.
+
+    Returns:
+        A tuple of three numpy ndarrays, containing the intensity values, rt_arr, and im_arr respectively.
+    """
+    # Filter the dataset "data_ms1" based on the values present in "peptide_group_ms" column that matches with "filter_peptides".
+    # Store the filtered result in a new variable called "data_filt". 
+    data_filt = data_ms1.loc[(data_ms1.peptide_group_ms.isin([filter_peptides]))]
+    
+    # Create a pivot table from the filtered data using 'im' as the index, 'rt' as columns, and 'int' as values.
+    # Store the result in a new variable called 'arr', an array of size im x rt where values are intensity values.
+    arr = data_filt.pivot_table(index='im', columns='rt', values='int')
+    
+    # Convert the index of arr to numpy array and store it to a variable named "im_arr".
+    im_arr = arr.index.to_numpy()
+    
+    # Convert the columns of arr to numpy array and store it to a variable named "rt_arr".
+    rt_arr = arr.columns.to_numpy()
+    
+    # Convert the pivot table into a 2D numpy array containing only intensity values and return it along with rt_arr and im_arr.
+    return arr.to_numpy(), rt_arr, im_arr
+
+def data_transform_wrapper(args):
+    """
+    A wrapper function that unpacks the arguments of the data_transform function and returns its result.
+    
+    Args:
+    args (tuple): A tuple containing two arguments: filter_peptides and data_ms1.
+    
+    Returns:
+    tuple: The result of calling the data_transform function with filter_peptides and data_ms1 as its arguments.
+    """
+    return data_transform(*args)
+
+
+def parallel_data_transform(unique_peptide_charge: List[str], data_ms1: pd.DataFrame, threads: int=1) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Transforms the data for each unique peptide in parallel using multiprocessing.
+
+    Args:
+        unique_peptide_charge (List[str]): A list of unique peptides to filter on.
+        data_ms1 (pd.DataFrame): The MS1 data to filter.
+        threads (int): The number of threads to use.
+
+    Returns:
+        Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]: A dictionary of data arrays, where each key is a unique
+        peptide and each value is a tuple containing the 2D numpy array of intensity values, the 'rt' array, and the 'im'
+        array.
+    """
+    # Create a pool of workers
+    with multiprocessing.Pool(processes=threads) as pool:
+        # Map the unique peptide_charge values to the data_transform function using the pool of workers
+        results = pool.map(data_transform_wrapper, [(peptide, data_ms1) for peptide in unique_peptide_charge])
+
+    # Combine the results into a dictionary of data arrays
+    return {peptide: result for peptide, result in zip(unique_peptide_charge, results)}
+
+def export_featuremaps(file: str, outfile:str, ms_level: List[int] = [1, 2], aggr_ms2: bool = True, verbose: int=0, threads: int=1):
+    """
+    Export feature maps from tsv file to pickles
+    """
+    # Data
+    filename, ext = os.path.splitext(file)
+    if ext == ".tsv":
+        data = pd.read_csv(file, sep="\t")
+    elif ext == ".parquet":
+        data = pd.read_parquet(file, engine="pyarrow")
+    elif ext == ".pkl":
+        data_ms1 = pd.read_pickle(file)
+    elif ext.lower() == ".mzml":
+        # Load data from targeted extracted mzML data
+        # TODO: Need to add a tag in targeted extracted data to indicate the mzML file is not the original raw data
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Exporting Targeted mzML to a numpy pickle...")
+        exp = TargeteddiaPASEFExperiment(file, None, None, None, None, ms_level, verbose, None, None)
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
+        exp.load_data(is_filtered=True)
+        data = exp.get_filtered_df(ms_level)
+    else:
+        raise ValueError(
+            f"Input file {file} format is not supported. Needs to be a 'tsv' or 'parquet' file, found {ext}!")
+
+    if isinstance(data, pd.DataFrame):
+        # Filter for ms level data
+        data_ms1 = data.loc[(data.ms_level.isin(ms_level))]
+        if aggr_ms2 and 2 in ms_level:
+            click.echo(
+                "Info: Aggregating MS2 fragments into a single MS2 Featuremap per precursor.")
+            data_ms1['aggr_mz'] = data_ms1.mz.astype(str)
+            data_ms1 = data_ms1.drop(columns=['Unnamed: 0', 'native_id', 'mz']).groupby(['ms_level', 'peptide', 'precursor_mz', 'charge', 'rt', 'im',
+                                                                                         'rt_apex', 'im_apex', 'rt_left_width', 'rt_right_width'])[['int', 'aggr_mz']].agg({'int': np.sum, 'aggr_mz': ','.join}).reset_index()
+
+        data_ms1['peptide_group'] = data_ms1.peptide.astype(
+            str) + "_" + data_ms1.charge.astype(str)
+        data_ms1['peptide_group_ms'] = data_ms1.peptide.astype(
+            str) + "_" + data_ms1.charge.astype(str) + "_ms" + data_ms1.ms_level.astype(str)
+    else:
+        raise ValueError(
+            f"Input data contains unexpected format. Has to be type pandas.DataFrame or a dictionary of tuples of numpy.ndarrays. Got {type(data)}")
+
+    if isinstance(data, pd.DataFrame):
+        unique_peptide_charge = np.unique(data_ms1['peptide_group_ms'])
+    else:
+        unique_peptide_charge = np.array(list(data_ms1.keys()))
+
+    click.echo(f"Info: Saving featuremaps to {outfile}")
+    data_arrs = parallel_data_transform(unique_peptide_charge, data_ms1, threads)
+    pickle.dump(data_arrs, open(outfile, 'wb'))
