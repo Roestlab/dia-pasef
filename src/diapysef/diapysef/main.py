@@ -9,6 +9,7 @@ from .util import setup_logger, argument_value_log, check_bruker_sdk
 from .targeted_data_extraction import TargeteddiaPASEFExperiment, generate_coordinates
 from .convert_tdf_to_mzml import convert_diapasef_tdf_to_mzml
 from .plotting import save_report_2d_rt_im_heatmap
+from .export import export_sqmass, export_featuremaps
 
 # Main Command Line Interface
 
@@ -82,33 +83,51 @@ def targeted_extraction(infile, target_coordinates, outfile, mz_tol, rt_window, 
 
 # Export filtered mzML to tabular data for plotting
 @cli.command()
-@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='A filtered targeted diaPASEF mzML file.')
-@click.option('--out', 'outfile', default=('diapasef_extracted_data.tsv'), show_default=True, type=str, help='Filename to save extracted data to.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='A filtered targeted diaPASEF mzML file, or a previously exported tsv file.')
+@click.option('--out', 'outfile', default=('diapasef_extracted_data.tsv'), show_default=True, type=str, help='Filename to save extracted data to, tsv or parquet if input is mzML or sqMass if input is tsv or mzML.')
+@click.option('--coords', 'target_coordinates', required=False, show_default=True, type=click.Path(exists=True), help="""File that contains target coordinates to extract data for, or a file that can be used to generate target coordinates from.\b\n\nCan be one of:\n\npickle (.pkl) - a pickle file that contains a python dictionary of coordinates, i.e. { "TELISVSEVHPS(UniMod:21)R" : {'precursor_mz':767.3691,'charge':2,'product_mz': [311.0639, 312.6357, 322.1867, ..., 11432.6832],'rt_apex':1736.98,'rt_boundaries':[1719.823, 1759.129],'im_apex':0.9884788}, "T(UniMod:21)ELISVSEVHPSR" : {'precursor_mz':767.3691, 'charge':2,'product_mz': [311.0639, 312.6357, 322.1867, ..., 11432.6832],'rt_apex':1730.08,'rt_boundaries':[1718.037, 1751.984],'im_apex':1.0261329}}""")
 @click.option('--mslevel', default='[1]', show_default=True, cls=PythonLiteralOption, help='list of mslevel(s) to extract data for. i.e. [1,2] would extract data for MS1 and MS2.')
+@click.option('--mz_tol', default=25, show_default=True, type=int, help='The m/z tolerance toget get upper and lower bounds arround target mz. Must be in ppm.')
+@click.option('--aggr_ms2/--no-aggr_ms2', 'aggr_ms2', default=False, show_default=True, help='Whether you want to aggregate MS2 data for each precursor. Only applicable for mzML to pkl export.')
 @click.option('--verbose', default=0, show_default=True, type=int, help='Level of verbosity. 0 - just displays info, 1 - display some debug info, 10 displays a lot of debug info.')
+@click.option('--threads', default=1, show_default=True, type=int, help='Number of threads to parallelize exporting across threads.')
 @click.option('--log_file', default='mobidik_export.log', show_default=True, type=str, help='Log file to save console messages.')
-def export(infile, outfile, mslevel, verbose, log_file):
+def export(infile, outfile, target_coordinates, mslevel, mz_tol, aggr_ms2, verbose, threads, log_file):
     '''
-    Export a reduced targeted mzML file to a tsv file
+    Export a reduced targeted mzML file to a tsv, parquet or sqMass file
     '''
     # Initialise logger
     setup_logger(log_file, verbose)
-
-    if verbose == 10:
+    
+    if verbose in [0, 1, 10]:
         args_dict = locals()
         argument_value_log(args_dict)
 
-    exp = TargeteddiaPASEFExperiment(
-        infile, None, None, None, None, mslevel, verbose, None, None)
-    click.echo(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
-    exp.load_data(is_filtered=True)
-    exp.save_filtered_tsv(mslevel, outfile)
-    click.echo(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished exporting data!")
+    in_type = infile.split('.')[-1]
+    out_type = outfile.split('.')[-1]
+
+    if in_type.lower()=='mzml' and out_type.lower()=='tsv':
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Exporting mzML to tsv...")
+        exp = TargeteddiaPASEFExperiment(
+            infile, None, None, None, None, mslevel, verbose, None, None)
+        click.echo(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Loading data...")
+        exp.load_data(is_filtered=True)
+        exp.save_filtered_tsv(mslevel, outfile)
+        click.echo(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Finished exporting data!")
+    
+    elif in_type.lower() in ['tsv', 'mzml'] and out_type.lower()=='sqmass':
+        if target_coordinates is None:
+            raise AssertionError(f"Target coordinates (--coords) is required to export tsv to sqMass!")
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Exporting tsv to sqMass...")
+        export_sqmass(infile, target_coordinates, outfile, mz_tol, mslevel, verbose, threads)
+
+    elif in_type.lower()=='mzml' and out_type.lower()=='pkl':
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Exporting mzML to pickle...")
+        export_featuremaps(infile, outfile, mslevel, aggr_ms2, verbose, threads)
 
 # Generate a pickle file containing a dictionary of peptide coordinates for targeted data extraction
-
 
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='An OSW file post Pyprophet statiscal validation.')

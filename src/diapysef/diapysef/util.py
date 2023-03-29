@@ -3,6 +3,9 @@ from __future__ import print_function
 import pyopenms
 import sys
 import os
+import numpy as np
+import pandas as pd
+import zlib
 import platform
 import click
 import ast
@@ -155,3 +158,30 @@ def argument_value_log(args_dict):
     for key, item in args_dict.items():
         logging.debug(f"Parameter: {key} = {item}")
     logging.debug("------------------------------------------------------------\n")
+
+def decompress_data(row: pd.Series) -> np.ndarray:
+    """Decompresses data stored in a row of a pandas DataFrame. This is generally the DATA table from and sqMass file.
+
+    Args:
+        row (pd.Series): A row of a pandas DataFrame containing the following columns:
+                         'DATA': compressed data (bytes), 'DATA_TYPE': data type (int),
+                         'COMPRESSION': compression level (int).
+
+    Returns:
+        np.ndarray: The decompressed data as a NumPy array.
+
+    Raises:
+        ValueError: If the buffer size is not a multiple of the element size.
+
+    """
+    x = row['DATA']
+    data_type = row['DATA_TYPE']
+    compression = row['COMPRESSION']
+    if compression == 1:
+        if data_type in [1, 3]:
+            # Intensity and Ion Mobility data are stored as float32
+            decomp_data = np.frombuffer(zlib.decompress(x), dtype=np.float32)
+        elif data_type in [0, 2, 4]:
+            # MZ and RT, and full 4D raw extracted data are stored as float64
+            decomp_data = np.frombuffer(zlib.decompress(x), dtype=np.float64)
+    return decomp_data

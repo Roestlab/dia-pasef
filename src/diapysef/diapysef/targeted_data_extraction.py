@@ -393,16 +393,36 @@ class data_io():
             spec = self.filtered.getSpectrum(k)
             if spec.getMSLevel() in ms_level:
                 mz, intensity = spec.get_peaks()
+                if (len(mz) == 0 and len(intensity) == 0):
+                    logging.warn(
+                        f"MS{spec.getMSLevel()} spectrum native id {spec.getNativeID()} had no m/z or intensity array, skipping this spectrum")
+                    continue
                 rt = np.full([mz.shape[0]], spec.getRT(), float)
                 im_tmp = spec.getFloatDataArrays()[0]
                 im = im_tmp.get_data()
-                add_df = pd.DataFrame({'native_id': spec.getNativeID(), 'ms_level': spec.getMSLevel(
-                ), 'peptide': spec.getMetaValue('peptide'), 'mz': mz, 'rt': rt, 'im': im, 'int': intensity})
+                precursor = spec.getPrecursors()[0]
+                if self.verbose == 10:
+                    logging.debug(
+                        f"Adding MS{spec.getMSLevel()} spectrum for peptide: {spec.getMetaValue('peptide')} with native id: {spec.getNativeID()}")
+                add_df = pd.DataFrame({'native_id': spec.getNativeID(), 'ms_level': spec.getMSLevel(), 'peptide': spec.getMetaValue(
+                    'peptide'), 'precursor_mz': spec.getMetaValue('precursor_mz'), 'charge': precursor.getCharge(), 'mz': mz, 'rt': rt, 'im': im, 'int': intensity})
+                ## Add additional meta data
+                meta_data = pd.DataFrame()
+                if spec.getMetaValue('rt_apex') is not None:
+                    meta_data['rt_apex'] = pd.Series(spec.getMetaValue('rt_apex'))
+                if spec.getMetaValue('im_apex') is not None:
+                    meta_data['im_apex'] = pd.Series(spec.getMetaValue('im_apex'))
+                if spec.getMetaValue('rt_left_width') is not None:
+                    meta_data['rt_left_width'] = pd.Series(spec.getMetaValue('rt_left_width'))    
+                if spec.getMetaValue('rt_right_width') is not None:
+                    meta_data['rt_right_width'] = pd.Series(spec.getMetaValue('rt_right_width'))
+                if not meta_data.empty:
+                    add_df = add_df.join(meta_data, how='cross')
                 results_df = pd.concat([results_df, add_df])
         return results_df
 
     @method_timer
-    def save_filtered_tsv(self, ms_level=[1], out_file="diapasef_extracted_data.tsv"):
+    def save_filtered_tsv(self, ms_level=[1], out_file="diapasef_extracted_data.tsv", out_type=None):
         """
         Save a tsv file of the targeted filtered spectra in tabular format
 
@@ -411,6 +431,10 @@ class data_io():
           ms_level: (list) list of ms level data to write out to file
           out_file: (str) output file to write data to
         """
+        if out_type is None:
+            out_type = out_file.split(".")[-1]
+        if out_type not in ["tsv", "parquet"]:
+            raise Exception("Output file type must be tsv or parquet")
         results_df = pd.DataFrame()
         for k in tqdm(range(self.filtered.getNrSpectra())):
             spec = self.filtered.getSpectrum(k)
@@ -442,10 +466,15 @@ class data_io():
                 if not meta_data.empty:
                     add_df = add_df.join(meta_data, how='cross')
                 results_df = pd.concat([results_df, add_df])
-        logging.info(
-            f"Saving filtered target spectra data to tabular tsv format: {out_file}")
-        results_df.to_csv(out_file, sep="\t")
-
+        if out_type == "tsv":
+            logging.info(
+                f"Saving filtered target spectra data to tabular tsv format: {out_file}")
+            results_df.to_csv(out_file, sep="\t")
+        elif out_type == "parquet":
+            logging.info(
+                f"Saving filtered target spectra data to parquet format: {out_file}")
+            results_df.to_parquet(out_file, engine='pyarrow')
+            
     def get_target_ms_level_indices(self):
         """
         Extract spectrum indices for a specific mslevel(s).
