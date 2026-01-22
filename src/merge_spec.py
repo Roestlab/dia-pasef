@@ -3,8 +3,8 @@ import sys
 import numpy as np
 inp = "/tmp/test.mzML"
 
-inp = sys.argv[1]
-out = sys.argv[2]
+inp = bytes(sys.argv[1], "utf8")
+out = bytes(sys.argv[2], "utf8")
 merge_scans = int(sys.argv[3])
 drop_scans = int(sys.argv[4])
 
