@@ -156,8 +156,10 @@ class TimsData:
                     throwLastTimsDataError(self.dll)
 
                 if required_len > len:
-                    if required_len > 16777216:
-                        # arbitrary limit for now...
+                    if required_len > 1073741824:
+                        # Sanity limit (1 GiB) on the per-frame buffer. The previous 16 MiB
+                        # limit was exceeded by dense MS1 frames on newer instruments
+                        # (e.g. timsTOF Ultra: ~18.8 MiB for ~2.3M peaks in a single frame).
                         raise RuntimeError("Maximum expected frame size exceeded.")
                     self.initial_frame_buffer_size = required_len / 4 + 1 # grow buffer
                 else:
